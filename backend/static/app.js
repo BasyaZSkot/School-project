@@ -73,7 +73,15 @@ function renderOffers(products = [], query = "") {
   let offerCount = 0;
   for (const product of products) {
     const card = makeElement("article", "offer-card");
-    card.append(makeElement("h4", "", product.title || "Товар"));
+    const heading = makeElement("div", "offer-product-head");
+    const firstImage = (product.offers || []).find(item => item.image_url)?.image_url;
+    if (firstImage && firstImage.startsWith("https://")) {
+      const image = makeElement("img", "offer-product-image");
+      image.src = firstImage; image.alt = product.title || "Фото товара"; image.loading = "lazy";
+      image.referrerPolicy = "no-referrer"; heading.append(image);
+    }
+    heading.append(makeElement("h4", "", product.title || "Товар"));
+    card.append(heading);
     const list = makeElement("div", "offer-rows");
     for (const offer of product.offers || []) {
       offerCount += 1;
