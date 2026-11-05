@@ -18,10 +18,10 @@ const providerMeta = {
   "Яндекс Маркет": { logo: "Я", className: "ym-logo" }
 };
 const statusMeta = {
-  access_required: { label: "Нужен доступ", className: "status-warn" },
-  policy_restricted: { label: "Ограничен правилами", className: "status-warn" },
-  ready: { label: "Подключён", className: "status-good" },
-  error: { label: "Временно недоступен", className: "status-error" }
+  access_required: { label: "Нет данных", className: "status-warn" },
+  policy_restricted: { label: "Нет данных", className: "status-warn" },
+  ready: { label: "Поиск завершён", className: "status-good" },
+  error: { label: "Не ответил", className: "status-error" }
 };
 function makeElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -47,7 +47,7 @@ function renderProviders(providers = []) {
     const top = makeElement("div", "provider-top");
     top.append(makeElement("span", `provider-logo ${meta.className}`, meta.logo));
     top.append(makeElement("span", `status ${status.className}`, status.label));
-    card.append(top, makeElement("h3", "", provider.marketplace), makeElement("p", "", provider.message || "Источник проверен."));
+    card.append(top, makeElement("h3", "", provider.marketplace));
     if (provider.search_url) {
       const link = makeElement("a", "provider-link", "Открыть поиск на сайте ↗");
       link.href = provider.search_url; link.target = "_blank"; link.rel = "noopener noreferrer"; card.append(link);
@@ -59,15 +59,12 @@ function renderProviders(providers = []) {
 async function addMonitor(offer, query) {
   const response = await fetch("/api/monitors", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query, product_url: offer.url, marketplace: offer.marketplace,
-      title: offer.title, interval_seconds: 3600
-    })
+    body: JSON.stringify({ query, product_url: offer.url, marketplace: offer.marketplace, title: offer.title, interval_seconds: 3600 })
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.detail || "Не удалось добавить монитор.");
   await loadMonitors();
-  showMessage(monitorNotice, "Товар добавлен. Первая проверка произойдёт при наличии данных от подключённого источника.");
+  showMessage(monitorNotice, "Товар добавлен в мониторинг.");
 }
 function renderOffers(products = [], query = "") {
   offersList.replaceChildren();
@@ -99,8 +96,7 @@ function renderOffers(products = [], query = "") {
         });
         actions.append(watch);
       }
-      row.append(actions);
-      list.append(row);
+      row.append(actions); list.append(row);
     }
     card.append(list); offersList.append(card);
   }
@@ -112,7 +108,7 @@ async function runSearch(query) {
   input.value = cleanQuery; setLoading(true);
   title.textContent = `Ищем «${cleanQuery}»`;
   emptyState.hidden = true; offersWrap.hidden = true; showMessage(notice, "");
-  providerGrid.replaceChildren(makeElement("div", "loading-card", "Проверяем площадки…"));
+  providerGrid.replaceChildren(makeElement("div", "loading-card", "Ищем товары на Ozon, Wildberries и Яндекс Маркете…"));
   try {
     const response = await fetch(`/api/search?${new URLSearchParams({ q: cleanQuery, limit: "20" })}`, { headers: { "Accept": "application/json" } });
     const data = await response.json();
@@ -121,15 +117,15 @@ async function runSearch(query) {
     renderProviders(data.providers || []); renderOffers(data.products || [], cleanQuery);
     emptyState.hidden = Boolean((data.products || []).length);
     if (!(data.products || []).length) {
-      emptyState.querySelector("strong").textContent = "Пока нет объединённых предложений";
-      emptyState.querySelector("span").textContent = "Открой поиск на нужной площадке по ссылке выше.";
+      emptyState.querySelector("strong").textContent = "Товары пока не найдены";
+      emptyState.querySelector("span").textContent = "Площадки не вернули карточки для этого запроса. Попробуй другое название.";
     }
     showMessage(notice, data.notice);
   } catch (error) {
     title.textContent = "Не удалось выполнить поиск"; providerGrid.replaceChildren();
-    emptyState.hidden = false; emptyState.querySelector("strong").textContent = "Сервер пока не отвечает";
-    emptyState.querySelector("span").textContent = error.message || "Проверь, запущен ли Backend.";
-    showMessage(notice, "Запусти Backend командой из инструкции в README.");
+    emptyState.hidden = false; emptyState.querySelector("strong").textContent = "Поиск временно недоступен";
+    emptyState.querySelector("span").textContent = error.message || "Сервер пока не отвечает.";
+    showMessage(notice, "Попробуй повторить поиск позже.");
   } finally { setLoading(false); }
 }
 async function loadMonitors() {
@@ -168,8 +164,7 @@ async function loadMonitors() {
       const remove = makeElement("button", "small-button danger-button", "Удалить");
       remove.type = "button";
       remove.addEventListener("click", async () => {
-        await fetch(`/api/monitors/${monitor.id}`, { method: "DELETE" });
-        await loadMonitors();
+        await fetch(`/api/monitors/${monitor.id}`, { method: "DELETE" }); await loadMonitors();
       });
       controls.append(toggle, history, remove); card.append(controls); monitorList.append(card);
     }
