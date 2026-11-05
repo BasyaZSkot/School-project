@@ -10,11 +10,7 @@ from .ym import YandexMarketAdapter
 
 
 class MarketplaceSearchService:
-    def __init__(
-        self,
-        adapters: list[SearchAdapter] | None = None,
-        provider_timeout: float = 12.0,
-    ):
+    def __init__(self, adapters: list[SearchAdapter] | None = None, provider_timeout: float = 12.0):
         self.adapters = adapters if adapters is not None else [
             OzonAdapter.from_env(),
             WildberriesAdapter.from_env(),
@@ -23,10 +19,7 @@ class MarketplaceSearchService:
         self.provider_timeout = provider_timeout
 
     async def _search_one(self, adapter: SearchAdapter, query: str, limit: int):
-        return await asyncio.wait_for(
-            adapter.search(query, limit),
-            timeout=self.provider_timeout,
-        )
+        return await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
 
     async def search(self, query: str, limit: int = 20) -> dict:
         query = query.strip()
@@ -39,7 +32,6 @@ class MarketplaceSearchService:
             *(self._search_one(adapter, query, limit) for adapter in self.adapters),
             return_exceptions=True,
         )
-
         provider_results = []
         offers: list[Offer] = []
         seen: set[tuple[str, str]] = set()
@@ -51,10 +43,9 @@ class MarketplaceSearchService:
                     "status": "error",
                     "search_url": "",
                     "offers": [],
-                    "message": f"Источник временно недоступен ({error_name}).",
+                    "message": "Площадка временно не ответила. Попробуйте ещё раз.",
                 })
                 continue
-
             provider_results.append(result.to_dict())
             for offer in result.offers:
                 identity = (offer.marketplace, offer.external_id or offer.url)
@@ -68,7 +59,6 @@ class MarketplaceSearchService:
 
         products = []
         for key, product_offers in grouped.items():
-            # Prices in different currencies must never be compared numerically.
             product_offers.sort(key=lambda item: (item.currency, item.price))
             lowest_by_currency = {}
             for offer in product_offers:
@@ -77,29 +67,22 @@ class MarketplaceSearchService:
                 "match_key": key,
                 "title": product_offers[0].title,
                 "lowest_price_by_currency": lowest_by_currency,
-                "offers": [
-                    {
-                        "marketplace": item.marketplace,
-                        "title": item.title,
-                        "price": item.price,
-                        "currency": item.currency,
-                        "url": item.url,
-                        "in_stock": item.in_stock,
-                        "image_url": item.image_url,
-                        "external_id": item.external_id,
-                    }
-                    for item in product_offers
-                ],
+                "offers": [{
+                    "marketplace": item.marketplace,
+                    "title": item.title,
+                    "price": item.price,
+                    "currency": item.currency,
+                    "url": item.url,
+                    "in_stock": item.in_stock,
+                    "image_url": item.image_url,
+                    "external_id": item.external_id,
+                } for item in product_offers],
             })
         products.sort(key=lambda item: normalize_title(item["title"]))
-
         return {
             "query": query,
             "providers": provider_results,
             "products": products,
             "total_offers": len(offers),
-            "notice": (
-                "Цены и наличие отображаются только из подключённых разрешённых "
-                "источников. Пока для неподключённых площадок доступны прямые ссылки."
-            ),
+            "notice": None if offers else "Поиск завершён, но площадки не вернули читаемые карточки товаров. Попробуйте изменить запрос.",
         }
