@@ -1,6 +1,8 @@
 """Adapter for licensed/partner JSON feeds with a normalized payload contract."""
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -9,11 +11,11 @@ from .base import DisabledAdapter, Offer, ProviderResult, SearchStatus
 
 
 class JsonFeedAdapter(DisabledAdapter):
-    """Fetch a partner feed returning {offers: [...]}.
+    """Fetch a partner feed and normalize its records into MultiMarket offers.
 
     Feed URL and token must come from server environment variables, never from
-    a browser request. Each item must contain title, price, currency and an HTTPS
-    product URL. Optional keys: id, brand, model, gtin, in_stock, image_url.
+    a browser request. The default contract is {"offers": [...]}; adapters may
+    provide a record mapper and alternate array key for approved native feeds.
     """
 
     def __init__(
@@ -25,6 +27,8 @@ class JsonFeedAdapter(DisabledAdapter):
         feed_url: str,
         token: str | None = None,
         timeout: float = 8.0,
+        records_key: str = "offers",
+        record_mapper: Callable[[Any], Offer | None] | None = None,
     ):
         parsed = urlparse(feed_url)
         if parsed.scheme != "https" or not parsed.netloc:
@@ -35,6 +39,8 @@ class JsonFeedAdapter(DisabledAdapter):
         self.feed_url = feed_url
         self.token = token
         self.timeout = timeout
+        self.records_key = records_key
+        self.record_mapper = record_mapper
         self.status = SearchStatus.ACCESS_REQUIRED
 
     def _map_offer(self, item: dict) -> Offer | None:
@@ -83,16 +89,20 @@ class JsonFeedAdapter(DisabledAdapter):
             response.raise_for_status()
             payload = response.json()
 
-        records = payload.get("offers", []) if isinstance(payload, dict) else payload
+        records = payload.get(self.records_key, []) if isinstance(payload, dict) else payload
         if not isinstance(records, list):
-            raise ValueError("Partner feed must return an offers array")
+            raise ValueError(f"Partner feed must return a {self.records_key} array")
 
         offers = []
         for record in records:
-            if isinstance(record, dict):
+            if self.record_mapper is not None:
+                offer = self.record_mapper(record)
+            elif isinstance(record, dict):
                 offer = self._map_offer(record)
-                if offer:
-                    offers.append(offer)
+            else:
+                offer = None
+            if offer is not None:
+                offers.append(offer)
             if len(offers) >= limit:
                 break
 
