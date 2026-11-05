@@ -67,7 +67,7 @@ uvicorn src.parcers.api:app --app-dir backend --reload
 - PATCH /api/monitors/{id} — пауза/возобновление и интервал.
 - DELETE /api/monitors/{id} — удалить.
 - GET /api/monitors/{id}/history — история.
-- GET /api/alerts — изменения цен.
+- GET /api/alerts — изменения цен.\n- GET /api/monitors/export.csv — экспорт списка отслеживания в CSV.\n\nДля Telegram-уведомлений задай MULTIMARKET_TELEGRAM_BOT_TOKEN и MULTIMARKET_TELEGRAM_CHAT_ID в backend/.env. Уведомление отправляется только при изменении цены на 10% и более. Без этих параметров Telegram не используется.
 
 Мониторинг не может обновить цену, если соответствующий источник не вернул тот же URL товара. В таком случае сохраняется статус проверки, но выдуманная точка цены не создаётся.
 

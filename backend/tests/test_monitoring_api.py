@@ -48,27 +48,37 @@ class MonitoringApiTests(unittest.TestCase):
         self.assertEqual(history.status_code, 200)
         self.assertEqual(history.json()["points"], [])
 
+        exported = self.client.get("/api/monitors/export.csv")
+        self.assertEqual(exported.status_code, 200)
+        self.assertIn("Coffee machine", exported.text)
+
         deleted = self.client.delete(f"/api/monitors/{monitor_id}")
         self.assertEqual(deleted.status_code, 200)
 
     def test_monitor_requires_https_valid_domain_and_minimum_interval(self):
-        bad_url = self.client.post("/api/monitors", json={
-            "query": "item", "product_url": "http://www.ozon.ru/product/1",
-            "marketplace": "Ozon", "title": "Item", "interval_seconds": 900,
-        })
-        self.assertEqual(bad_url.status_code, 422)
+        cases = [
+            {"query": "item", "product_url": "http://www.ozon.ru/product/1",
+             "marketplace": "Ozon", "title": "Item", "interval_seconds": 900},
+            {"query": "item", "product_url": "https://market.example/item",
+             "marketplace": "Ozon", "title": "Item", "interval_seconds": 900},
+            {"query": "item", "product_url": "https://www.ozon.ru/product/1",
+             "marketplace": "Ozon", "title": "Item", "interval_seconds": 10},
+        ]
+        for payload in cases:
+            with self.subTest(payload=payload):
+                response = self.client.post("/api/monitors", json=payload)
+                self.assertEqual(response.status_code, 422)
 
-        bad_domain = self.client.post("/api/monitors", json={
-            "query": "item", "product_url": "https://market.example/item",
-            "marketplace": "Ozon", "title": "Item", "interval_seconds": 900,
+    def test_batch_search_accepts_multiple_queries(self):
+        response = self.client.post("/api/search/batch", json={
+            "queries": ["coffee machine", "wireless headphones"],
+            "limit": 5,
         })
-        self.assertEqual(bad_domain.status_code, 422)
-
-        bad_interval = self.client.post("/api/monitors", json={
-            "query": "item", "product_url": "https://www.ozon.ru/product/1",
-            "marketplace": "Ozon", "title": "Item", "interval_seconds": 10,
-        })
-        self.assertEqual(bad_interval.status_code, 422)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["query"] for item in response.json()["results"]],
+            ["coffee machine", "wireless headphones"],
+        )
 
 
 if __name__ == "__main__":

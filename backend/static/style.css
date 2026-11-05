@@ -128,3 +128,6 @@ h1 span { color: var(--accent); }
  .offer-row { align-items:flex-start; flex-wrap:wrap; }
  .offer-actions { width:100%; justify-content:flex-start; }
 }
+
+.monitor-header-actions { display:flex; align-items:center; gap:8px; }
+.monitor-header-actions a { text-decoration:none; }

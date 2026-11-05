@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
+import csv
+from io import StringIO
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -47,6 +49,11 @@ app = FastAPI(
 )
 
 
+class BatchSearchRequest(BaseModel):
+    queries: list[str] = Field(min_length=1, max_length=10)
+    limit: int = Field(default=20, ge=1, le=50)
+
+
 class MonitorCreate(BaseModel):
     query: str = Field(min_length=1, max_length=160)
     product_url: str = Field(min_length=10, max_length=2048)
@@ -81,6 +88,23 @@ async def search(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post("/api/search/batch")
+async def batch_search(payload: BatchSearchRequest):
+    queries = [query.strip() for query in payload.queries]
+    if any(not query for query in queries):
+        raise HTTPException(status_code=422, detail="Запросы не должны быть пустыми")
+    semaphore = asyncio.Semaphore(3)
+
+    async def run_one(query: str):
+        async with semaphore:
+            try:
+                return await search_service.search(query, payload.limit)
+            except Exception as exc:
+                return {"query": query, "error": type(exc).__name__, "products": [], "providers": []}
+
+    return {"results": await asyncio.gather(*(run_one(query) for query in queries))}
+
+
 @app.post("/api/monitors", status_code=201)
 async def create_monitor(payload: MonitorCreate):
     parsed = urlparse(payload.product_url)
@@ -112,6 +136,24 @@ async def create_monitor(payload: MonitorCreate):
 @app.get("/api/monitors")
 async def get_monitors():
     return {"monitors": monitoring.list_monitors()}
+
+
+@app.get("/api/monitors/export.csv")
+async def export_monitors():
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["title", "marketplace", "product_url", "current_price", "currency", "active", "last_status"])
+    for monitor in monitoring.list_monitors():
+        writer.writerow([
+            monitor["title"], monitor["marketplace"], monitor["product_url"],
+            monitor["current_price"], monitor["currency"], monitor["active"],
+            monitor["last_status"],
+        ])
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="multimarket-monitors.csv"'},
+    )
 
 
 @app.patch("/api/monitors/{monitor_id}")

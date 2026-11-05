@@ -134,15 +134,16 @@ def due_monitors(limit: int = 25) -> list[dict[str, Any]]:
 
 
 def record_check(monitor_id: str, *, price: float | None, currency: str | None,
-                 status: str, alert_threshold_percent: float = 10.0) -> None:
+                 status: str, alert_threshold_percent: float = 10.0) -> dict[str, Any] | None:
     now = _now()
+    alert_data = None
     with _connect() as db:
         row = db.execute(
             "SELECT current_price, currency, interval_seconds FROM monitors WHERE id = ?",
             (monitor_id,),
         ).fetchone()
         if row is None:
-            return
+            return None
         if price is not None and currency:
             previous = row["current_price"]
             previous_currency = row["currency"]
@@ -154,12 +155,18 @@ def record_check(monitor_id: str, *, price: float | None, currency: str | None,
             if previous is not None and previous_currency == currency and previous > 0:
                 change = (price - previous) / previous * 100
                 if abs(change) >= alert_threshold_percent:
-                    db.execute(
+                    cursor = db.execute(
                         """INSERT INTO price_alerts
                         (monitor_id, old_price, new_price, currency, change_percent, created_at)
                         VALUES (?, ?, ?, ?, ?, ?)""",
                         (monitor_id, previous, price, currency, change, now.isoformat()),
                     )
+                    alert_data = {
+                        "id": cursor.lastrowid, "monitor_id": monitor_id,
+                        "old_price": previous, "new_price": price,
+                        "currency": currency, "change_percent": change,
+                        "created_at": now.isoformat(),
+                    }
             db.execute(
                 """UPDATE monitors SET current_price = ?, currency = ?, last_checked_at = ?,
                 next_run_at = ?, last_status = ? WHERE id = ?""",
@@ -175,6 +182,33 @@ def record_check(monitor_id: str, *, price: float | None, currency: str | None,
                  (now + timedelta(seconds=row["interval_seconds"])).isoformat(),
                  status, monitor_id),
             )
+    return alert_data
+
+
+async def send_telegram_alert(alert: dict[str, Any], monitor: dict[str, Any]) -> None:
+    """Send opt-in price alerts; credentials stay in server environment."""
+    token = os.getenv("MULTIMARKET_TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("MULTIMARKET_TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    import httpx
+
+    direction = "снизилась" if alert["change_percent"] < 0 else "выросла"
+    message = (
+        f"MultiMarket: цена товара «{monitor['title']}» {direction} на "
+        f"{abs(alert['change_percent']):.1f}%\\n"
+        f"{alert['old_price']:.2f} → {alert['new_price']:.2f} {alert['currency']}\\n"
+        f"{monitor['product_url']}"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": message},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        return
 
 
 def price_history(monitor_id: str, limit: int = 500) -> list[dict[str, Any]]:
@@ -217,10 +251,12 @@ async def monitoring_loop(search_service, stop_event, interval_seconds: int = 30
                     None,
                 )
                 if matched:
-                    record_check(
+                    alert = record_check(
                         monitor["id"], price=float(matched["price"]),
                         currency=matched["currency"], status="ok",
                     )
+                    if alert:
+                        await send_telegram_alert(alert, monitor)
                 else:
                     record_check(monitor["id"], price=None, currency=None, status="offer_not_returned")
             except Exception:
