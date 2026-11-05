@@ -20,12 +20,14 @@ def _read(record: Any, key: str, default: Any = None) -> Any:
     return getattr(record, key, default)
 
 
-def _positive_number(value: Any) -> float | None:
+def _rubles_from_kopecks(value: Any) -> float | None:
     try:
-        number = float(value)
+        kopecks = float(value)
     except (TypeError, ValueError):
         return None
-    return number if number > 0 else None
+    if kopecks <= 0:
+        return None
+    return kopecks / 100
 
 
 def wb_record_to_offer(record: Any) -> Offer | None:
@@ -42,19 +44,17 @@ def wb_record_to_offer(record: Any) -> Offer | None:
     if not title:
         return None
 
-    # In the example parser these values are already expressed in RUB, not kopecks.
-    price = _positive_number(_read(record, "salePriceU"))
+    # WB's *PriceU fields are integer kopecks in the source response.
+    price = _rubles_from_kopecks(_read(record, "salePriceU"))
     if price is None:
-        price = _positive_number(_read(record, "priceU"))
+        price = _rubles_from_kopecks(_read(record, "priceU"))
     if price is None:
         sizes = _read(record, "sizes", []) or []
         if sizes:
             first_size = sizes[0]
             size_price = _read(first_size, "price")
             raw = _read(size_price, "product") or _read(size_price, "basic")
-            candidate = _positive_number(raw)
-            # The nested API-style fields are kopecks in the sample model.
-            price = candidate / 100 if candidate is not None else None
+            price = _rubles_from_kopecks(raw)
     if price is None:
         return None
 

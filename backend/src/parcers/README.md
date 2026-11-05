@@ -11,7 +11,8 @@ contains a parser built around undocumented internal browser endpoints, browser
 cookie acquisition, and a configured proxy. Those transport/access-control
 pieces are intentionally not connected to the aggregator. The reusable record
 mapping is implemented in `wb_adapter.py`: it converts records shaped like the
-example parser's `Item` model into MultiMarket `Offer` objects.
+example parser's `Item` model into MultiMarket `Offer` objects. The WB
+`*PriceU` fields are converted from kopecks to RUB.
 
 The WB adapter accepts an injected async source callable. It remains in
 `access_required` mode until an approved API, licensed feed, or written
