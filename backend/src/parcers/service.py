@@ -38,12 +38,23 @@ class MarketplaceSearchService:
         for adapter, result in zip(self.adapters, results):
             if isinstance(result, Exception):
                 error_name = "timeout" if isinstance(result, asyncio.TimeoutError) else type(result).__name__
+                search_url = ""
+                if hasattr(adapter, "search_url"):
+                    from urllib.parse import quote_plus
+                    search_url = adapter.search_url.format(query=quote_plus(query))
+                elif hasattr(adapter, "build_search_url"):
+                    search_url = adapter.build_search_url(query)
+                message = (
+                    "timeout: площадка не ответила за отведённое время."
+                    if isinstance(result, asyncio.TimeoutError)
+                    else "Площадка временно не ответила. Попробуйте ещё раз."
+                )
                 provider_results.append({
                     "marketplace": adapter.marketplace,
                     "status": "error",
-                    "search_url": "",
+                    "search_url": search_url,
                     "offers": [],
-                    "message": "Площадка временно не ответила. Попробуйте ещё раз.",
+                    "message": message,
                 })
                 continue
             provider_results.append(result.to_dict())
