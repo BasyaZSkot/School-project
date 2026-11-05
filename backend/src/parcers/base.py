@@ -87,7 +87,7 @@ def normalize_title(value: str) -> str:
 
 def offer_group_key(offer: Offer) -> str:
     if offer.gtin:
-        digits = re.sub(r"\\D", "", offer.gtin)
+        digits = "".join(char for char in offer.gtin if char.isdigit())
         return f"gtin:{digits}"
     if offer.brand and offer.model:
         return f"model:{normalize_title(offer.brand)}:{normalize_title(offer.model)}"
