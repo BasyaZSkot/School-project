@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import StrEnum
+from enum import Enum
 from typing import Protocol
 from urllib.parse import quote_plus
 import re
 import unicodedata
 
 
-class SearchStatus(StrEnum):
+class SearchStatus(str, Enum):
     READY = "ready"
     ACCESS_REQUIRED = "access_required"
     POLICY_RESTRICTED = "policy_restricted"
@@ -69,6 +69,8 @@ class DisabledAdapter:
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         if not query.strip():
             raise ValueError("Search query must not be empty")
+        if not 1 <= limit <= 50:
+            raise ValueError("limit must be between 1 and 50")
         return ProviderResult(
             marketplace=self.marketplace,
             status=self.status,
@@ -85,8 +87,8 @@ def normalize_title(value: str) -> str:
 
 def offer_group_key(offer: Offer) -> str:
     if offer.gtin:
-        return f"gtin:{re.sub(r'\D', '', offer.gtin)}"
+        digits = re.sub(r"\\D", "", offer.gtin)
+        return f"gtin:{digits}"
     if offer.brand and offer.model:
         return f"model:{normalize_title(offer.brand)}:{normalize_title(offer.model)}"
-    # Conservative fallback: only exact normalized titles are grouped.
     return f"title:{normalize_title(offer.title)}"
