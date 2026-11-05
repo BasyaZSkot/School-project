@@ -1,19 +1,23 @@
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .service import MarketplaceSearchService
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "static"
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+STATIC_DIR = BACKEND_DIR / "static"
+load_dotenv(BACKEND_DIR / ".env")
 
 app = FastAPI(
     title="MultiMarket Search API",
-    version="0.3.0",
+    version="0.4.0",
     description=(
-        "Единый поиск MultiMarket. Источники без разрешённого доступа возвращают "
-        "ссылку на поиск и статус вместо выдуманных цен."
+        "Единый поиск MultiMarket. Разрешённые партнёрские JSON-фиды "
+        "подключаются через переменные окружения; неподключённые площадки "
+        "возвращают прямые ссылки без выдуманных цен."
     ),
 )
 search_service = MarketplaceSearchService()
@@ -26,7 +30,11 @@ async def home():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "MultiMarket"}
+    return {
+        "status": "ok",
+        "service": "MultiMarket",
+        "version": app.version,
+    }
 
 
 @app.get("/api/search")

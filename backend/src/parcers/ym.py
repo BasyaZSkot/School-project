@@ -1,4 +1,7 @@
+import os
+
 from .base import DisabledAdapter, SearchStatus
+from .feed import JsonFeedAdapter
 
 
 class YandexMarketAdapter(DisabledAdapter):
@@ -6,7 +9,19 @@ class YandexMarketAdapter(DisabledAdapter):
     base_search_url = "https://market.yandex.ru/search?text={query}"
     status = SearchStatus.POLICY_RESTRICTED
     reason = (
-        "Автоматизированный доступ без предусмотренной авторизации не включён. "
-        "Для интеграции нужен согласованный API/партнёрский источник и соблюдение "
-        "его лицензионных условий."
+        "Для автоматизированной выдачи нужен согласованный API или "
+        "лицензированный партнёрский источник данных."
     )
+
+    @classmethod
+    def from_env(cls):
+        url = os.getenv("MULTIMARKET_YM_FEED_URL")
+        if not url:
+            return cls()
+        return JsonFeedAdapter(
+            marketplace=cls.marketplace,
+            base_search_url=cls.base_search_url,
+            reason=cls.reason,
+            feed_url=url,
+            token=os.getenv("MULTIMARKET_YM_FEED_TOKEN"),
+        )

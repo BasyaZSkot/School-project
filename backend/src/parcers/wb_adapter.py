@@ -1,8 +1,7 @@
 """Bridge WB parser records into MultiMarket's normalized Offer contract.
 
-This module intentionally does not perform network requests or obtain browser
-cookies. Supply records from an approved/licensed data source via the adapter's
-async source callable.
+This module does not perform network requests or obtain browser cookies. Supply
+records from an approved/licensed data source via the async source callable.
 """
 from __future__ import annotations
 
@@ -44,17 +43,20 @@ def wb_record_to_offer(record: Any) -> Offer | None:
     if not title:
         return None
 
-    # WB's *PriceU fields are integer kopecks in the source response.
-    price = _rubles_from_kopecks(_read(record, "salePriceU"))
+    # Prefer raw nested size prices: the example Pydantic model may already have
+    # converted those into salePriceU/priceU when the top-level values were absent.
+    price = None
+    sizes = _read(record, "sizes", []) or []
+    if sizes:
+        size_price = _read(sizes[0], "price")
+        if size_price:
+            price = _rubles_from_kopecks(
+                _read(size_price, "product") or _read(size_price, "basic")
+            )
+    if price is None:
+        price = _rubles_from_kopecks(_read(record, "salePriceU"))
     if price is None:
         price = _rubles_from_kopecks(_read(record, "priceU"))
-    if price is None:
-        sizes = _read(record, "sizes", []) or []
-        if sizes:
-            first_size = sizes[0]
-            size_price = _read(first_size, "price")
-            raw = _read(size_price, "product") or _read(size_price, "basic")
-            price = _rubles_from_kopecks(raw)
     if price is None:
         return None
 

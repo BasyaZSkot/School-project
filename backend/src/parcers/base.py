@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Protocol
 from urllib.parse import quote_plus
+import math
 import re
 import unicodedata
 
@@ -28,6 +29,18 @@ class Offer:
     gtin: str | None = None
     in_stock: bool | None = None
     image_url: str | None = None
+
+    def __post_init__(self) -> None:
+        self.title = self.title.strip()
+        self.currency = self.currency.upper().strip()
+        if not self.title:
+            raise ValueError("Offer title must not be empty")
+        if not math.isfinite(self.price) or self.price <= 0:
+            raise ValueError("Offer price must be a finite positive number")
+        if len(self.currency) != 3 or not self.currency.isalpha():
+            raise ValueError("Offer currency must be a three-letter code")
+        if not self.url.startswith("https://"):
+            raise ValueError("Offer URL must use HTTPS")
 
 
 @dataclass(slots=True)
@@ -88,7 +101,8 @@ def normalize_title(value: str) -> str:
 def offer_group_key(offer: Offer) -> str:
     if offer.gtin:
         digits = "".join(char for char in offer.gtin if char.isdigit())
-        return f"gtin:{digits}"
+        if len(digits) in {8, 12, 13, 14}:
+            return f"gtin:{digits}"
     if offer.brand and offer.model:
         return f"model:{normalize_title(offer.brand)}:{normalize_title(offer.model)}"
     return f"title:{normalize_title(offer.title)}"

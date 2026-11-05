@@ -1,22 +1,53 @@
 # MultiMarket marketplace connectors
 
-## Current state
+## What is implemented
 
-This package provides a concurrent search service, a normalized offer contract,
-conservative product grouping, provider status reporting, and direct buyer-search
-links for Ozon, Wildberries, and Yandex Market.
+- One asynchronous search service for Ozon, Wildberries and Yandex Market.
+- Shared `Offer` model with validated price, currency and HTTPS product URL.
+- Concurrent provider requests with per-provider timeouts and isolated errors.
+- Conservative product grouping by valid GTIN, brand + model, or exact normalized title.
+- Currency-aware price grouping: RUB and USD are never compared as if they were the same unit.
+- Wildberries example-record mapping in `wb_adapter.py`, including conversion of `*PriceU` kopecks into RUB.
+- Optional normalized JSON partner-feed adapters configured by environment variables.
+- FastAPI endpoints and responsive Russian-language search UI.
+- Unit/API tests and a GitHub Actions workflow.
 
-**Live marketplace scraping is not enabled by default.** The WB example commit
-contains a parser built around undocumented internal browser endpoints, browser
-cookie acquisition, and a configured proxy. Those transport/access-control
-pieces are intentionally not connected to the aggregator. The reusable record
-mapping is implemented in `wb_adapter.py`: it converts records shaped like the
-example parser's `Item` model into MultiMarket `Offer` objects. The WB
-`*PriceU` fields are converted from kopecks to RUB.
+## Live data status
 
-The WB adapter accepts an injected async source callable. It remains in
-`access_required` mode until an approved API, licensed feed, or written
-permission is configured. No prices or stock are fabricated.
+No marketplace is scraped automatically by default. The WB example code uses undocumented internal browser endpoints and browser-cookie acquisition. That transport is not wired into MultiMarket. The reusable WB record mapper accepts an injected approved source, and all three providers can accept a licensed/partner JSON feed.
+
+A live feed must return this shape:
+
+```json
+{
+  "offers": [
+    {
+      "id": "sku-123",
+      "title": "Product name",
+      "price": 1299.5,
+      "currency": "RUB",
+      "url": "https://marketplace.example/product/sku-123",
+      "brand": "Brand",
+      "model": "Model",
+      "gtin": "4601234567890",
+      "in_stock": true,
+      "image_url": "https://cdn.example/image.webp"
+    }
+  ]
+}
+```
+
+The endpoint receives `q` and `limit` query parameters. It must be an HTTPS endpoint that you are authorized to use. Optional bearer tokens are read from environment variables. The app never fabricates prices when a feed is absent or unavailable.
+
+## Configure feeds
+
+Copy `backend/.env.example` to `backend/.env` and fill only the endpoints and tokens supplied by an authorized partner:
+
+- `MULTIMARKET_OZON_FEED_URL` / `MULTIMARKET_OZON_FEED_TOKEN`
+- `MULTIMARKET_WB_FEED_URL` / `MULTIMARKET_WB_FEED_TOKEN`
+- `MULTIMARKET_YM_FEED_URL` / `MULTIMARKET_YM_FEED_TOKEN`
+
+Never commit `backend/.env`. It is excluded by `backend/.gitignore`. Do not paste credentials into chat or source code.
 
 ## Run locally
 
@@ -27,10 +58,9 @@ python -m pip install -r backend/requirements.txt
 uvicorn src.parcers.api:app --app-dir backend --reload
 ```
 
-Open `http://127.0.0.1:8000/api/health`, `/api/search?q=Sony%20headphones`,
-or `/docs`.
+Open `http://127.0.0.1:8000`, `/api/health`, `/api/search?q=Sony%20headphones`, or `/docs`.
 
-## WB mapping tests
+## Tests
 
 From the repository root:
 
@@ -38,13 +68,10 @@ From the repository root:
 PYTHONPATH=backend python -m unittest discover -s backend/tests -v
 ```
 
-## Enabling live offers
+GitHub Actions runs the same test command on pushes to `main` and `feat/**`, and on pull requests targeting `main`.
 
-Enable a provider only after an approved source is available: official API access,
-a licensed affiliate/content feed, or written permission for a documented public
-interface. Implement an async source returning records with the fields used by
-`wb_record_to_offer`, or map the source's records directly to `Offer`.
+## WB example parser integration
 
-Keep rate limits, caching, timeouts, source attribution, currency, and stock
-freshness explicit. Do not add CAPTCHA solving, proxy rotation, browser
-fingerprint spoofing, or other access-control circumvention.
+The example parser's data model and field names informed the WB mapper. The browser/session and internal-endpoint transport are not invoked by the MultiMarket service. If a permitted source becomes available, inject an async source callable into `WildberriesAdapter.from_record_source(source)` that returns records compatible with the example `Item` model.
+
+Keep source rate limits, caching, attribution, currency and stock freshness explicit. Do not implement CAPTCHA solving, proxy rotation, browser fingerprint spoofing, or other access-control circumvention.
