@@ -16,6 +16,7 @@ class MonitoringApiTests(unittest.TestCase):
             monitoring, "DB_PATH", Path(self.temp_dir.name) / "api.sqlite3"
         )
         self.path_patcher.start()
+        monitoring.init_db()
         self.client = TestClient(app)
 
     def tearDown(self):
