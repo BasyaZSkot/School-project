@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Protocol
 from urllib.parse import quote_plus
 import re
 import unicodedata
 
 
-class SearchStatus(str, Enum):
+class SearchStatus(StrEnum):
     READY = "ready"
     ACCESS_REQUIRED = "access_required"
     POLICY_RESTRICTED = "policy_restricted"
@@ -85,8 +85,7 @@ def normalize_title(value: str) -> str:
 
 def offer_group_key(offer: Offer) -> str:
     if offer.gtin:
-        digits = re.sub(r"\\D", "", offer.gtin)
-        return f"gtin:{digits}"
+        return f"gtin:{re.sub(r'\D', '', offer.gtin)}"
     if offer.brand and offer.model:
         return f"model:{normalize_title(offer.brand)}:{normalize_title(offer.model)}"
     # Conservative fallback: only exact normalized titles are grouped.

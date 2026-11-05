@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7fb">
+  <meta name="description" content="MultiMarket — единая точка поиска товаров на популярных маркетплейсах.">
+  <title>MultiMarket — поиск товаров</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="MultiMarket — главная">
+      <span class="brand-mark">M</span>
+      <span>Multi<span class="brand-accent">Market</span></span>
+    </a>
+    <span class="topbar-note">Поиск по маркетплейсам</span>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> Умный поиск покупателя</div>
+      <h1>Найди товар.<br><span>Сравни предложения.</span></h1>
+      <p class="hero-copy">Один запрос — три маркетплейса. Ищи товары на Ozon, Wildberries и Яндекс Маркете в одном месте.</p>
+
+      <form class="search-form" id="search-form">
+        <label class="sr-only" for="search-input">Название товара</label>
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input id="search-input" name="q" type="search" maxlength="160"
+          placeholder="Например, наушники Sony WH-1000XM5" autocomplete="off" required>
+        <button id="search-button" type="submit"><span>Найти</span><span aria-hidden="true">→</span></button>
+      </form>
+      <div class="search-hint">Попробуй: <button class="example-query" type="button">iPhone 16</button><button class="example-query" type="button">кофемашина</button><button class="example-query" type="button">Sony WH-1000XM5</button></div>
+    </section>
+
+    <section class="results-section" aria-live="polite">
+      <div class="section-heading">
+        <div>
+          <div class="section-kicker">РЕЗУЛЬТАТЫ</div>
+          <h2 id="results-title">Готов к поиску</h2>
+        </div>
+        <span class="result-count" id="result-count">3 площадки</span>
+      </div>
+      <div class="provider-grid" id="provider-grid">
+        <article class="provider-card">
+          <div class="provider-top"><span class="provider-logo ozon-logo">O</span><span class="status status-neutral">Ожидает запрос</span></div>
+          <h3>Ozon</h3><p>Поиск товаров на площадке</p>
+        </article>
+        <article class="provider-card">
+          <div class="provider-top"><span class="provider-logo wb-logo">WB</span><span class="status status-neutral">Ожидает запрос</span></div>
+          <h3>Wildberries</h3><p>Поиск товаров на площадке</p>
+        </article>
+        <article class="provider-card">
+          <div class="provider-top"><span class="provider-logo ym-logo">Я</span><span class="status status-neutral">Ожидает запрос</span></div>
+          <h3>Яндекс Маркет</h3><p>Поиск товаров на площадке</p>
+        </article>
+      </div>
+
+      <div class="offers-wrap" id="offers-wrap" hidden>
+        <div class="offers-heading"><h3>Найденные предложения</h3><span id="offers-caption"></span></div>
+        <div id="offers-list" class="offers-list"></div>
+      </div>
+
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">⌕</div>
+        <strong>Здесь появятся результаты</strong>
+        <span>Введи название товара в строку выше.</span>
+      </div>
+      <div class="notice" id="notice" hidden><span class="notice-icon">i</span><p></p></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>© MultiMarket</span>
+    <span>Цены и наличие показываются только из подключённых источников данных.</span>
+  </footer>
+</body>
+</html>
