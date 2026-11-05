@@ -15,6 +15,7 @@
       <span class="brand-mark">M</span>
       <span>Multi<span class="brand-accent">Market</span></span>
     </a>
+    <nav class="topnav"><a href="#results">Поиск</a><a href="#monitoring">Мониторинг цен</a></nav>
     <span class="topbar-note">Поиск по маркетплейсам</span>
   </header>
 
@@ -34,46 +35,35 @@
       <div class="search-hint">Попробуй: <button class="example-query" type="button">iPhone 16</button><button class="example-query" type="button">кофемашина</button><button class="example-query" type="button">Sony WH-1000XM5</button></div>
     </section>
 
-    <section class="results-section" aria-live="polite">
+    <section class="results-section" id="results" aria-live="polite">
       <div class="section-heading">
-        <div>
-          <div class="section-kicker">РЕЗУЛЬТАТЫ</div>
-          <h2 id="results-title">Готов к поиску</h2>
-        </div>
+        <div><div class="section-kicker">РЕЗУЛЬТАТЫ</div><h2 id="results-title">Готов к поиску</h2></div>
         <span class="result-count" id="result-count">3 площадки</span>
       </div>
       <div class="provider-grid" id="provider-grid">
-        <article class="provider-card">
-          <div class="provider-top"><span class="provider-logo ozon-logo">O</span><span class="status status-neutral">Ожидает запрос</span></div>
-          <h3>Ozon</h3><p>Поиск товаров на площадке</p>
-        </article>
-        <article class="provider-card">
-          <div class="provider-top"><span class="provider-logo wb-logo">WB</span><span class="status status-neutral">Ожидает запрос</span></div>
-          <h3>Wildberries</h3><p>Поиск товаров на площадке</p>
-        </article>
-        <article class="provider-card">
-          <div class="provider-top"><span class="provider-logo ym-logo">Я</span><span class="status status-neutral">Ожидает запрос</span></div>
-          <h3>Яндекс Маркет</h3><p>Поиск товаров на площадке</p>
-        </article>
+        <article class="provider-card"><div class="provider-top"><span class="provider-logo ozon-logo">O</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Ozon</h3><p>Поиск товаров на площадке</p></article>
+        <article class="provider-card"><div class="provider-top"><span class="provider-logo wb-logo">WB</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Wildberries</h3><p>Поиск товаров на площадке</p></article>
+        <article class="provider-card"><div class="provider-top"><span class="provider-logo ym-logo">Я</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Яндекс Маркет</h3><p>Поиск товаров на площадке</p></article>
       </div>
-
       <div class="offers-wrap" id="offers-wrap" hidden>
         <div class="offers-heading"><h3>Найденные предложения</h3><span id="offers-caption"></span></div>
         <div id="offers-list" class="offers-list"></div>
       </div>
-
-      <div class="empty-state" id="empty-state">
-        <div class="empty-icon">⌕</div>
-        <strong>Здесь появятся результаты</strong>
-        <span>Введи название товара в строку выше.</span>
-      </div>
+      <div class="empty-state" id="empty-state"><div class="empty-icon">⌕</div><strong>Здесь появятся результаты</strong><span>Введи название товара в строку выше.</span></div>
       <div class="notice" id="notice" hidden><span class="notice-icon">i</span><p></p></div>
+    </section>
+
+    <section class="monitoring-section" id="monitoring">
+      <div class="section-heading">
+        <div><div class="section-kicker">ИСТОРИЯ И КОНТРОЛЬ</div><h2>Мониторинг цен</h2></div>
+        <button class="refresh-button" id="refresh-monitors" type="button">Обновить</button>
+      </div>
+      <p class="monitoring-intro">Добавляй товары из результатов поиска и MultiMarket будет сохранять историю цен. Проверка работает, когда для площадки подключён разрешённый источник данных.</p>
+      <div id="monitor-list" class="monitor-list"><div class="monitor-empty">Пока нет отслеживаемых товаров.</div></div>
+      <div class="notice" id="monitor-notice" hidden><span class="notice-icon">i</span><p></p></div>
     </section>
   </main>
 
-  <footer class="footer">
-    <span>© MultiMarket</span>
-    <span>Цены и наличие показываются только из подключённых источников данных.</span>
-  </footer>
+  <footer class="footer"><span>© MultiMarket</span><span>Цены и наличие показываются только из подключённых источников данных.</span></footer>
 </body>
 </html>

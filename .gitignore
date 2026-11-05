@@ -1,23 +1,8 @@
-# IDE
-.idea/
-.vscode/
-
-# Python
+.env
+.venv/
 __pycache__/
 *.py[cod]
-.venv/
-venv/
-
-# Secrets and local configuration
-.env
-*.pem
-*.key
-
-# Generated parser output
-backend/src/parcers/wb_parse_search_phrase-master/results/
-backend/src/parcers/wb_parse_search_phrase-master/downloaded_files/
-
-# Test artifacts
 .pytest_cache/
 .coverage
 htmlcov/
+backend/data/

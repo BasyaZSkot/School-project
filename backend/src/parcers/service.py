@@ -44,7 +44,7 @@ class MarketplaceSearchService:
         offers: list[Offer] = []
         seen: set[tuple[str, str]] = set()
         for adapter, result in zip(self.adapters, results):
-            if isinstance(result, BaseException):
+            if isinstance(result, Exception):
                 error_name = "timeout" if isinstance(result, asyncio.TimeoutError) else type(result).__name__
                 provider_results.append({
                     "marketplace": adapter.marketplace,
