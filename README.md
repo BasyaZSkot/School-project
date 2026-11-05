@@ -9,6 +9,7 @@ MultiMarket — агрегатор поиска товаров на маркет
 - Сравнение цен только внутри одной валюты.
 - Изоляция ошибок источников и тайм-ауты.
 - Подключение разрешённых JSON-фидов через серверные переменные окружения.
+- Для WB поддерживаются как нормализованные `offers`, так и нативные записи `products` из разрешённого фида.
 - Локальный список отслеживаемых товаров, периодическая проверка, история цен и уведомления о заметных изменениях.
 - REST API и русскоязычный веб-интерфейс.
 
@@ -23,7 +24,7 @@ MultiMarket — агрегатор поиска товаров на маркет
 ```bash
 python -m venv .venv
 # Windows:
-.venv\Scripts\activate
+.venv\\Scripts\\activate
 # macOS/Linux:
 # source .venv/bin/activate
 python -m pip install -r backend/requirements.txt
@@ -34,9 +35,9 @@ uvicorn src.parcers.api:app --app-dir backend --reload
 
 ## Подключение партнёрских фидов
 
-Скопируй backend/.env.example в backend/.env и добавь URL и токены только от разрешённых источников. Не добавляй .env в Git.
+Скопируй `backend/.env.example` в `backend/.env` и добавь URL и токены только от разрешённых источников. Не добавляй `.env` в Git.
 
-Фид должен принимать параметры q и limit, возвращать JSON вида:
+Стандартный формат фида — JSON с массивом `offers`:
 
 ```json
 {
@@ -57,17 +58,30 @@ uvicorn src.parcers.api:app --app-dir backend --reload
 }
 ```
 
+Фид принимает параметры `q` и `limit`. Для WB дополнительно доступен режим совместимости с записями формата исходного WB-примера. Если разрешённый feed endpoint возвращает `{"products":[...]}` с полями `id`, `name`, `salePriceU`, `priceU`, `sizes`, `brand`, `totalQuantity`, `image_links`, задай:
+
+```env
+MULTIMARKET_WB_FEED_URL=https://your-approved-provider.example/search
+MULTIMARKET_WB_FEED_TOKEN=your-token
+MULTIMARKET_WB_FEED_FORMAT=wb_records
+```
+
+Поля `salePriceU`, `priceU` и вложенные цены размера трактуются как копейки и переводятся в рубли. Этот режим только преобразует ответ разрешённого источника; он не обращается к внутренним endpoint-ам WB и не получает cookies/сессии.
+
 ## Мониторинг цен
 
-Из карточки предложения нажми «Следить за ценой». По умолчанию товар проверяется раз в час; допустимый интервал — от 15 минут до 7 дней. История сохраняется в SQLite (backend/data/multimarket.sqlite3). Изменение цены на 10% и более записывается как alert. Цены в разных валютах не сравниваются между собой.
+Из карточки предложения нажми «Следить за ценой». По умолчанию товар проверяется раз в час; допустимый интервал — от 15 минут до 7 дней. История сохраняется в SQLite (`backend/data/multimarket.sqlite3`). Изменение цены на 10% и более записывается как alert. Цены в разных валютах не сравниваются между собой.
 
 Эндпоинты:
-- POST /api/monitors — добавить товар.
-- GET /api/monitors — список.
-- PATCH /api/monitors/{id} — пауза/возобновление и интервал.
-- DELETE /api/monitors/{id} — удалить.
-- GET /api/monitors/{id}/history — история.
-- GET /api/alerts — изменения цен.\n- GET /api/monitors/export.csv — экспорт списка отслеживания в CSV.\n\nДля Telegram-уведомлений задай MULTIMARKET_TELEGRAM_BOT_TOKEN и MULTIMARKET_TELEGRAM_CHAT_ID в backend/.env. Уведомление отправляется только при изменении цены на 10% и более. Без этих параметров Telegram не используется.
+- `POST /api/monitors` — добавить товар.
+- `GET /api/monitors` — список.
+- `PATCH /api/monitors/{id}` — пауза/возобновление и интервал.
+- `DELETE /api/monitors/{id}` — удалить.
+- `GET /api/monitors/{id}/history` — история.
+- `GET /api/alerts` — изменения цен.
+- `GET /api/monitors/export.csv` — экспорт списка отслеживания в CSV.
+
+Для Telegram-уведомлений задай `MULTIMARKET_TELEGRAM_BOT_TOKEN` и `MULTIMARKET_TELEGRAM_CHAT_ID` в `backend/.env`. Уведомление отправляется только при изменении цены на 10% и более.
 
 Мониторинг не может обновить цену, если соответствующий источник не вернул тот же URL товара. В таком случае сохраняется статус проверки, но выдуманная точка цены не создаётся.
 
