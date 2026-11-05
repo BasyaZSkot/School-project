@@ -131,3 +131,7 @@ h1 span { color: var(--accent); }
 
 .monitor-header-actions { display:flex; align-items:center; gap:8px; }
 .monitor-header-actions a { text-decoration:none; }
+
+.offer-product-head { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+.offer-product-head h4 { margin:0; font-size:14px; }
+.offer-product-image { width:76px; height:76px; flex:0 0 76px; object-fit:contain; border:1px solid var(--line); border-radius:10px; background:white; }
