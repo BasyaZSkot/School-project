@@ -32,7 +32,7 @@ SOFTWARE.
 
 Source: https://github.com/prog-time/grex
 
-The project requester confirmed written permission to use this repository. Product-page parsing in embedded_state.py and ym.py adapts Grex's Ozon widgetStates field mapping and Yandex Market data-auto selectors from crawlers/ozon.py and crawlers/yandex_market.py. The integration reads ordinary public HTML only; browser cookie capture, private API interception, proxy rotation, and CAPTCHA retry mechanisms are not included.
+The project requester confirmed written permission to use this repository. Ozon widgetStates parsing and Yandex Market data-auto selectors (search tiles and product-page fields) are adapted from crawlers/ozon.py and crawlers/yandex_market.py. The integration reads ordinary public HTML only; browser cookie capture, private API interception, proxy rotation, and CAPTCHA retry mechanisms are not included.
 
 ## Duff89/wb_parse_search_phrase
 

@@ -20,7 +20,65 @@ def page_html(page):
     )
 
 
+def search_card_html():
+    cards = []
+    for product_id, title, price in [
+        (123456, "Кофемашина Philips 3300", "68 103 ₽"),
+        (234567, "Кофемашина DeLonghi", "71 500 ₽"),
+    ]:
+        cards.append(
+            '<div data-auto="searchOrganic">'
+            '<a data-auto="snippet-link" href="/card/coffee-maker/{id}?source=search">'
+            '<span data-auto="snippet-title">{title}</span></a>'
+            '<span data-auto="snippet-price-current">{price}</span>'
+            '<img src="https://avatars.mds.yandex.net/images/{id}.jpg">'
+            '</div>'.format(id=product_id, title=title, price=price)
+        )
+    return "<html><body>{}</body></html>".format("".join(cards))
+
+
 class YandexSearchPaginationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_extracts_data_auto_search_cards_when_jsonld_is_missing(self):
+        adapter = YandexMarketAdapter(
+            marketplace="Яндекс Маркет",
+            search_url="https://market.yandex.ru/search?text={query}",
+            allowed_hosts=("market.yandex.ru",),
+        )
+        requested = []
+
+        async def fetch(url):
+            requested.append(url)
+            return url, search_card_html()
+
+        adapter._fetch_public_page = fetch
+        result = await adapter.search("кофемашина", limit=2)
+
+        self.assertEqual(result.status.value, "ready")
+        self.assertEqual(len(result.offers), 2)
+        self.assertEqual(result.offers[0].price, 68103)
+        self.assertEqual(result.offers[0].external_id, "123456")
+        self.assertEqual(result.offers[0].url, "https://market.yandex.ru/card/coffee-maker/123456")
+        self.assertEqual(len(requested), 1)
+
+    async def test_stops_on_challenge_and_keeps_first_page_cards(self):
+        adapter = YandexMarketAdapter(
+            marketplace="Яндекс Маркет",
+            search_url="https://market.yandex.ru/search?text={query}",
+            allowed_hosts=("market.yandex.ru",),
+        )
+
+        async def fetch(url):
+            if "page=" in url:
+                return "https://market.yandex.ru/showcaptcha", "<html>SmartCaptcha</html>"
+            return url, search_card_html()
+
+        adapter._fetch_public_page = fetch
+        result = await adapter.search("кофемашина", limit=20)
+
+        self.assertEqual(result.status.value, "ready")
+        self.assertEqual(len(result.offers), 2)
+        self.assertIn("проверку", result.message)
+
     async def test_fetches_public_search_pages_until_twenty_products(self):
         adapter = YandexMarketAdapter(
             marketplace="Яндекс Маркет",

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
 
 import httpx
 
@@ -85,17 +84,33 @@ class MarketplaceSearchService:
                 continue
             provider_results.append(result.to_dict())
             for offer in result.offers:
-                identity = (offer.marketplace, offer.external_id or offer.url)
+                identity = (offer.marketplace, offer.url)
                 if identity not in seen:
                     seen.add(identity)
                     offers.append(offer)
 
-        grouped: dict[str, list[Offer]] = defaultdict(list)
+        # A comparison group may contain at most one offer from each marketplace.
+        # Keep same-marketplace listings separate so they are not mistaken for
+        # cross-market price comparisons.
+        grouped: list[tuple[str, list[Offer]]] = []
         for offer in offers:
-            grouped[offer_group_key(offer)].append(offer)
+            key = offer_group_key(offer)
+            matching = next(
+                (
+                    product_offers
+                    for group_key, product_offers in grouped
+                    if group_key == key
+                    and all(item.marketplace != offer.marketplace for item in product_offers)
+                ),
+                None,
+            )
+            if matching is None:
+                grouped.append((key, [offer]))
+            else:
+                matching.append(offer)
 
         products = []
-        for key, product_offers in grouped.items():
+        for key, product_offers in grouped:
             product_offers.sort(key=lambda item: (item.currency, item.price))
             lowest_by_currency = {}
             for offer in product_offers:

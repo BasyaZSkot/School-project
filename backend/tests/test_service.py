@@ -53,6 +53,39 @@ class MarketplaceSearchServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["products"][0]["lowest_price_by_currency"], {"RUB": 2500.0})
         self.assertEqual(result["products"][0]["offers"][0]["marketplace"], "Ozon")
 
+    async def test_keeps_same_marketplace_listings_in_separate_products(self):
+        adapters = [
+            FakeAdapter("Яндекс Маркет", [
+                make_offer("Яндекс Маркет", "Coffee maker X", 10000, item_id="ym-1"),
+                make_offer("Яндекс Маркет", "Coffee maker X", 10500, item_id="ym-2"),
+            ]),
+        ]
+        result = await MarketplaceSearchService(adapters).search("кофемашина")
+
+        self.assertEqual(result["total_offers"], 2)
+        self.assertEqual(len(result["products"]), 2)
+        self.assertTrue(all(len(product["offers"]) == 1 for product in result["products"]))
+
+    async def test_cross_marketplace_matches_one_offer_per_marketplace(self):
+        adapters = [
+            FakeAdapter("Ozon", [make_offer("Ozon", "Coffee maker X", 10000, item_id="oz-1")]),
+            FakeAdapter("Яндекс Маркет", [
+                make_offer("Яндекс Маркет", "Coffee maker X", 9900, item_id="ym-1"),
+                make_offer("Яндекс Маркет", "Coffee maker X", 10500, item_id="ym-2"),
+            ]),
+        ]
+        result = await MarketplaceSearchService(adapters).search("кофемашина")
+
+        self.assertEqual(len(result["products"]), 2)
+        self.assertCountEqual(
+            sorted(len(product["offers"]) for product in result["products"]),
+            [1, 2],
+        )
+        self.assertTrue(all(
+            len({offer["marketplace"] for offer in product["offers"]}) == len(product["offers"])
+            for product in result["products"]
+        ))
+
     async def test_does_not_compare_different_currencies(self):
         adapters = [
             FakeAdapter("A", [make_offer("A", "Same item", 100, "USD", item_id="a")]),
