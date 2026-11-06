@@ -23,15 +23,20 @@ class MarketplaceSearchService:
     async def _search_one(self, adapter: SearchAdapter, query: str, limit: int):
         return await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
 
-    async def search(self, query: str, limit: int = 20) -> dict:
+    async def search(self, query: str, limit: int = 20, offset: int = 0) -> dict:
         query = query.strip()
         if not query:
             raise ValueError("Search query must not be empty")
         if not 1 <= limit <= 50:
             raise ValueError("limit must be between 1 and 50")
+        if not 0 <= offset <= 100:
+            raise ValueError("offset must be between 0 and 100")
 
+        # Fetch enough records from each provider to assemble the requested
+        # global page after cross-marketplace grouping and deduplication.
+        provider_limit = min(50, offset + limit + 1)
         results = await asyncio.gather(
-            *(self._search_one(adapter, query, limit) for adapter in self.adapters),
+            *(self._search_one(adapter, query, provider_limit) for adapter in self.adapters),
             return_exceptions=True,
         )
         provider_results = []
@@ -101,10 +106,17 @@ class MarketplaceSearchService:
                 } for item in product_offers],
             })
         products.sort(key=lambda item: normalize_title(item["title"]))
+        total_products = len(products)
+        page_products = products[offset:offset + limit]
+        has_more = total_products > offset + limit
         return {
             "query": query,
             "providers": provider_results,
-            "products": products,
+            "products": page_products,
+            "offset": offset,
+            "limit": limit,
+            "total_products": total_products,
+            "has_more": has_more,
             "total_offers": len(offers),
             "notice": None if offers else "Поиск завершён, но площадки не вернули читаемые карточки товаров. Попробуйте изменить запрос.",
         }
