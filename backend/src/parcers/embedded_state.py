@@ -126,45 +126,44 @@ def _first_text(value: Any, preferred_keys: tuple[str, ...]) -> str | None:
 
 
 def _ozon_title(card: dict) -> str | None:
-    for node in _nodes(card):
-        if node.get("id") == "name":
-            title = _first_text(node, ("text", "value", "title"))
-            if title:
-                return title
+    main_state = card.get("mainState")
+    if isinstance(main_state, list):
+        for state in main_state:
+            if not isinstance(state, dict) or state.get("id") != "name":
+                continue
+            text_state = state.get("textDS")
+            if isinstance(text_state, dict):
+                title = text_state.get("text")
+                if isinstance(title, str) and title.strip():
+                    return title.strip()
     return _first_text(card, ("title", "name"))
 
 
 def _ozon_price(card: dict) -> float | None:
-    price_nodes: list[Any] = []
-    for node in _nodes(card):
-        if str(node.get("type") or "").lower() == "pricev2":
-            price_nodes.append(node)
-        for key, value in node.items():
-            if "pricev2" in str(key).lower():
-                price_nodes.append(value)
-
-    for price_node in price_nodes:
-        for item in _nodes(price_node):
-            for key in ("text", "value", "price", "intPart", "amount"):
-                value = item.get(key)
-                if isinstance(value, (int, float)) and not isinstance(value, bool):
-                    if value > 0:
-                        return float(value)
-                if isinstance(value, str):
-                    match = re.search(
-                        r"(?<!\\d)(\\d[\\d\\s\\u00a0]*(?:[,.]\\d{1,2})?)\\s*(?:₽|руб(?:\\.|лей|ля)?|RUB)",
-                        value,
-                        re.IGNORECASE,
-                    )
-                    if match:
-                        raw = re.sub(r"\\s", "", match.group(1)).replace(",", ".")
-                        try:
-                            parsed = float(raw)
-                        except ValueError:
-                            continue
-                        if parsed > 0:
-                            return parsed
-    return None
+    main_state = card.get("mainState")
+    if not isinstance(main_state, list):
+        return None
+    price_block = next(
+        (state.get("priceV2") for state in main_state
+         if isinstance(state, dict) and state.get("type") == "priceV2"),
+        None,
+    )
+    prices = price_block.get("price", []) if isinstance(price_block, dict) else []
+    # Ozon marks the active price explicitly; do not accidentally use
+    # ORIGINAL_PRICE when the discounted PRICE is also present.
+    active = next(
+        (item.get("text") for item in prices
+         if isinstance(item, dict) and item.get("textStyle") == "PRICE"),
+        None,
+    )
+    if not isinstance(active, str):
+        return None
+    digits = re.sub(r"[^\\d]", "", active)
+    try:
+        value = float(digits)
+    except ValueError:
+        return None
+    return value if value > 0 else None
 
 
 def _ozon_link(card: dict) -> str | None:
@@ -195,8 +194,13 @@ def _ozon_sku(card: dict) -> str | None:
     return None
 
 
+def _ozon_sku_from_url(url: str) -> str | None:
+    match = re.search(r"-(\\d+)/?$", url) or re.search(r"(\\d{6,})", url)
+    return match.group(1) if match else None
+
+
 def extract_ozon_embedded(html: str, page_url: str, allowed_url) -> list[Offer]:
-    """Read Ozon tile cards from widgetStates already present in public HTML."""
+    """Read tileGridDesktop search cards from widgetStates embedded in public HTML."""
     offers: list[Offer] = []
     seen: set[str] = set()
     for document in embedded_json_documents(html):
@@ -205,18 +209,23 @@ def extract_ozon_embedded(html: str, page_url: str, allowed_url) -> list[Offer]:
             if not isinstance(widgets, dict):
                 continue
             for widget_name, raw_widget in widgets.items():
-                name = str(widget_name).lower()
-                if not any(marker in name for marker in ("tilegriddesktop", "searchresults", "sponsored", "premium")):
+                widget_base_name = str(widget_name).split("-", 1)[0].lower()
+                if widget_base_name not in {"tilegriddesktop", "searchresults"}:
                     continue
                 try:
                     widget = json.loads(raw_widget) if isinstance(raw_widget, str) else raw_widget
                 except (json.JSONDecodeError, TypeError):
                     continue
-                for card in _nodes(widget):
-                    action_link = _ozon_link(card)
-                    if not action_link:
+                if not isinstance(widget, dict):
+                    continue
+                items = widget.get("items", [])
+                if not isinstance(items, list):
+                    continue
+                for card in items:
+                    if not isinstance(card, dict):
                         continue
-                    product_url = allowed_url(action_link, page_url)
+                    action_link = _ozon_link(card)
+                    product_url = allowed_url(action_link, page_url) if action_link else None
                     title = _ozon_title(card)
                     price = _ozon_price(card)
                     if not product_url or not title or price is None or product_url in seen:
@@ -227,7 +236,7 @@ def extract_ozon_embedded(html: str, page_url: str, allowed_url) -> list[Offer]:
                         price=price,
                         currency="RUB",
                         url=product_url,
-                        external_id=_ozon_sku(card),
+                        external_id=_ozon_sku(card) or _ozon_sku_from_url(product_url),
                         image_url=_ozon_image(card),
                     ))
                     seen.add(product_url)
