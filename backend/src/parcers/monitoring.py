@@ -242,14 +242,30 @@ async def monitoring_loop(search_service, stop_event, interval_seconds: int = 30
     while not stop_event.is_set():
         for monitor in due_monitors():
             try:
-                result = await search_service.search(monitor["query"], limit=50)
-                matched = next(
-                    (offer for provider in result["providers"]
-                     for offer in provider.get("offers", [])
-                     if offer.get("url") == monitor["product_url"]
-                     and offer.get("marketplace") == monitor["marketplace"]),
-                    None,
-                )
+                matched = None
+                parse_product = getattr(search_service, "parse_product", None)
+                if callable(parse_product):
+                    try:
+                        parsed_offer = await parse_product(
+                            monitor["marketplace"], monitor["product_url"]
+                        )
+                    except Exception:
+                        parsed_offer = None
+                    if parsed_offer is not None:
+                        matched = {
+                            "price": parsed_offer.price,
+                            "currency": parsed_offer.currency,
+                        }
+
+                if matched is None:
+                    result = await search_service.search(monitor["query"], limit=50)
+                    matched = next(
+                        (offer for provider in result["providers"]
+                         for offer in provider.get("offers", [])
+                         if offer.get("url") == monitor["product_url"]
+                         and offer.get("marketplace") == monitor["marketplace"]),
+                        None,
+                    )
                 if matched:
                     alert = record_check(
                         monitor["id"], price=float(matched["price"]),

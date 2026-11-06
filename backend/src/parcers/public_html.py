@@ -232,14 +232,14 @@ class PublicHtmlSearchAdapter:
                 break
         return offers
 
-    async def search(self, query: str, limit: int = 20) -> ProviderResult:
-        if not query.strip():
-            raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
-        # Normalize whitespace without imposing a minimum query length.
-        clean_query = " ".join(query.split())
-        url = self.search_url.format(query=quote_plus(clean_query))
+    def _extract_product(self, html: str, page_url: str) -> Offer | None:
+        expected_path = urlparse(page_url).path.rstrip("/")
+        for offer in self._extract(html, page_url, 50):
+            if urlparse(offer.url).path.rstrip("/") == expected_path:
+                return offer
+        return None
+
+    async def _fetch_public_page(self, url: str) -> tuple[str, str]:
         headers = {
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.7",
@@ -249,13 +249,36 @@ class PublicHtmlSearchAdapter:
                 "Chrome/131.0.0.0 Safari/537.36"
             ),
         }
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True, headers=headers) as client:
+        async with httpx.AsyncClient(
+            timeout=self.timeout, follow_redirects=True, headers=headers
+        ) as client:
             response = await client.get(url)
             response.raise_for_status()
             final_url = str(response.url)
             if not self._valid_marketplace_url(final_url, url):
                 raise ValueError("Marketplace redirected outside its own domain")
-            offers = self._extract(response.text, final_url, limit)
+            return final_url, response.text
+
+    async def parse_product(self, product_url: str) -> Offer | None:
+        valid_url = self._valid_marketplace_url(product_url, product_url)
+        if not valid_url:
+            raise ValueError("Product URL is outside this marketplace")
+        final_url, html = await self._fetch_public_page(valid_url)
+        offer = self._extract_product(html, final_url)
+        if offer is not None:
+            offer.url = final_url
+        return offer
+
+    async def search(self, query: str, limit: int = 20) -> ProviderResult:
+        if not query.strip():
+            raise ValueError("Search query must not be empty")
+        if not 1 <= limit <= 50:
+            raise ValueError("limit must be between 1 and 50")
+        # Normalize whitespace without imposing a minimum query length.
+        clean_query = " ".join(query.split())
+        url = self.search_url.format(query=quote_plus(clean_query))
+        final_url, html = await self._fetch_public_page(url)
+        offers = self._extract(html, final_url, limit)
         return ProviderResult(
             marketplace=self.marketplace,
             status=SearchStatus.READY if offers else SearchStatus.NO_RESULTS,

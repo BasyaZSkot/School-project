@@ -1,4 +1,5 @@
 import os
+import re
 
 from .embedded_state import extract_wildberries_embedded
 from .feed import JsonFeedAdapter
@@ -18,6 +19,14 @@ class WildberriesAdapter(PublicHtmlSearchAdapter):
         # it. No internal search endpoint or browser session is used.
         offers = extract_wildberries_embedded(html, limit)
         return offers if offers else super()._extract(html, page_url, limit)
+
+    def _extract_product(self, html: str, page_url: str):
+        product_id = re.search(r"/catalog/(\d+)(?:/|$)", page_url)
+        if product_id:
+            for offer in extract_wildberries_embedded(html, 50):
+                if offer.external_id == product_id.group(1):
+                    return offer
+        return super()._extract_product(html, page_url)
 
     @classmethod
     def from_env(cls):

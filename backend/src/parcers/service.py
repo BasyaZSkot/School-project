@@ -20,6 +20,16 @@ class MarketplaceSearchService:
         ]
         self.provider_timeout = provider_timeout
 
+    async def parse_product(self, marketplace: str, product_url: str) -> Offer | None:
+        adapter = next(
+            (item for item in self.adapters if item.marketplace == marketplace),
+            None,
+        )
+        parser = getattr(adapter, "parse_product", None) if adapter else None
+        if not callable(parser):
+            return None
+        return await asyncio.wait_for(parser(product_url), timeout=self.provider_timeout)
+
     async def _search_one(self, adapter: SearchAdapter, query: str, limit: int):
         return await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
 

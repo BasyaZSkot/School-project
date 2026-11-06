@@ -1,6 +1,6 @@
 import os
 
-from .embedded_state import extract_ozon_embedded
+from .embedded_state import extract_ozon_embedded, extract_ozon_product
 from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter
 
@@ -21,6 +21,9 @@ class OzonAdapter(PublicHtmlSearchAdapter):
             self._valid_marketplace_url,
         )
         return offers[:limit] if offers else super()._extract(html, page_url, limit)
+
+    def _extract_product(self, html: str, page_url: str):
+        return extract_ozon_product(html, page_url) or super()._extract_product(html, page_url)
 
     @classmethod
     def from_env(cls):

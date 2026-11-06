@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .base import Offer
+from .public_html import _price_from_offer
 from .wb_adapter import wb_record_to_offer
 
 
@@ -245,6 +246,62 @@ def _ozon_sku(card: dict) -> str | None:
 def _ozon_sku_from_url(url: str) -> str | None:
     match = re.search(r"-(\d+)/?$", url) or re.search(r"(\d{6,})", url)
     return match.group(1) if match else None
+
+
+def _ozon_widget_price(value: Any) -> float | None:
+    if isinstance(value, (dict, list)):
+        value = _first_text(value, ("text", "price", "value"))
+    return _price_from_offer({"price": value})
+
+
+def extract_ozon_product(html: str, page_url: str) -> Offer | None:
+    # Adapted from Grex's Ozon widget parsing.
+    title = None
+    product_id = None
+    current_price = None
+    image_url = None
+    for document in embedded_json_documents(html):
+        for root in _nodes(document):
+            widgets = root.get("widgetStates")
+            if not isinstance(widgets, dict):
+                continue
+            for widget_name, raw_widget in widgets.items():
+                name = str(widget_name).lower()
+                try:
+                    widget = json.loads(raw_widget) if isinstance(raw_widget, str) else raw_widget
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                if not isinstance(widget, dict):
+                    continue
+                if "webproductheading" in name:
+                    title = widget.get("title") or _first_text(widget, ("title", "name")) or title
+                elif "webprice" in name:
+                    current_price = (
+                        _ozon_widget_price(widget.get("price"))
+                        or _ozon_widget_price(widget.get("currentPrice"))
+                        or _ozon_price(widget)
+                        or current_price
+                    )
+                elif "webgallery" in name:
+                    product_id = widget.get("sku") or product_id
+                    images = widget.get("images")
+                    if isinstance(images, list):
+                        for image in images:
+                            candidate = image.get("src") if isinstance(image, dict) else image
+                            if isinstance(candidate, str) and candidate.startswith("https://"):
+                                image_url = candidate
+                                break
+    if not title or current_price is None:
+        return None
+    return Offer(
+        marketplace="Ozon",
+        title=str(title),
+        price=current_price,
+        currency="RUB",
+        url=page_url,
+        external_id=str(product_id or _ozon_sku_from_url(page_url) or "") or None,
+        image_url=image_url,
+    )
 
 
 def extract_ozon_embedded(html: str, page_url: str, allowed_url) -> list[Offer]:
