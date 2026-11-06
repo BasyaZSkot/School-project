@@ -84,6 +84,50 @@ def _price_from_offer(offer: dict) -> float | None:
     return None
 
 
+
+class _MicrodataProductParser(HTMLParser):
+    """Read Schema.org Product microdata from server-rendered HTML."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.products: list[dict[str, str]] = []
+        self._current: dict[str, str] | None = None
+        self._stack: list[tuple[str, str | None]] = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        itemtype = attrs.get("itemtype", "").lower()
+        if attrs.get("itemscope") is not None and "schema.org/product" in itemtype:
+            if self._current is not None:
+                self.products.append(self._current)
+            self._current = {}
+        prop = attrs.get("itemprop")
+        if self._current is not None and prop:
+            value = (attrs.get("content") or attrs.get("data-price")
+                     or attrs.get("href") or attrs.get("src") or attrs.get("value"))
+            if value:
+                self._current[prop] = value.strip()
+        self._stack.append((tag, prop))
+
+    def handle_data(self, data):
+        if self._current is None or not self._stack:
+            return
+        prop = next((p for _, p in reversed(self._stack) if p), None)
+        if prop and data.strip():
+            self._current[prop] = (self._current.get(prop, "") + " " + data.strip()).strip()
+
+    def handle_endtag(self, tag):
+        for index in range(len(self._stack) - 1, -1, -1):
+            if self._stack[index][0] == tag:
+                del self._stack[index:]
+                break
+
+    def close(self):
+        super().close()
+        if self._current is not None:
+            self.products.append(self._current)
+            self._current = None
+
+
 class PublicHtmlSearchAdapter:
     def __init__(self, *, marketplace: str, search_url: str, allowed_hosts: tuple[str, ...], timeout: float = 10.0):
         self.marketplace = marketplace
@@ -157,6 +201,35 @@ class PublicHtmlSearchAdapter:
                     seen.add(product_url)
                     if len(offers) >= limit:
                         return offers
+        if offers:
+            return offers
+
+        # Some server-rendered pages publish Schema.org microdata instead of JSON-LD.
+        microdata = _MicrodataProductParser()
+        microdata.feed(html)
+        microdata.close()
+        for item in microdata.products:
+            title = item.get("name")
+            raw_url = item.get("url")
+            product_url = self._valid_marketplace_url(raw_url, page_url) if raw_url else None
+            price = _price_from_offer({"price": item.get("price")})
+            if not title or not product_url or price is None or product_url in seen:
+                continue
+            currency = str(item.get("priceCurrency") or "RUB").upper()
+            if len(currency) != 3 or not currency.isalpha():
+                currency = "RUB"
+            image = item.get("image")
+            image_url = urljoin(page_url, image) if image else None
+            if image_url and urlparse(image_url).scheme != "https":
+                image_url = None
+            offers.append(Offer(
+                marketplace=self.marketplace, title=title, price=price,
+                currency=currency, url=product_url, image_url=image_url,
+                external_id=item.get("sku") or None,
+            ))
+            seen.add(product_url)
+            if len(offers) >= limit:
+                break
         return offers
 
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
@@ -185,8 +258,8 @@ class PublicHtmlSearchAdapter:
             offers = self._extract(response.text, final_url, limit)
         return ProviderResult(
             marketplace=self.marketplace,
-            status=SearchStatus.READY,
+            status=SearchStatus.READY if offers else SearchStatus.NO_RESULTS,
             search_url=url,
             offers=offers,
-            message=None if offers else "Страница открылась, но не предоставила структурированные карточки товаров.",
+            message=None if offers else "Страница доступна, но карточки не опубликованы в поддерживаемой публичной разметке (JSON-LD/microdata).",
         )
