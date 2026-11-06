@@ -158,7 +158,7 @@ def _ozon_price(card: dict) -> float | None:
     )
     if not isinstance(active, str):
         return None
-    digits = re.sub(r"[^\\d]", "", active)
+    digits = re.sub(r"[^\d]", "", active)
     try:
         value = float(digits)
     except ValueError:
@@ -195,7 +195,7 @@ def _ozon_sku(card: dict) -> str | None:
 
 
 def _ozon_sku_from_url(url: str) -> str | None:
-    match = re.search(r"-(\\d+)/?$", url) or re.search(r"(\\d{6,})", url)
+    match = re.search(r"-(\d+)/?$", url) or re.search(r"(\d{6,})", url)
     return match.group(1) if match else None
 
 
