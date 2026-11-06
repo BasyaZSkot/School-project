@@ -1,4 +1,5 @@
 import unittest
+from urllib.parse import quote_plus
 
 from src.parcers.public_html import PublicHtmlSearchAdapter
 
@@ -49,6 +50,33 @@ class PublicMarketplaceHtmlTests(unittest.TestCase):
         offers = self.adapter._extract(html, "https://www.ozon.ru/search/", 20)
         self.assertEqual(len(offers), 1)
         self.assertEqual(offers[0].url, "https://www.ozon.ru/product/coffee/")
+
+    def test_extracts_aggregate_offer_price_specification(self):
+        html = """
+        <script type="application/ld+json">
+        {"@type":"Product","name":"Планшет","url":"/product/tablet/",
+         "offers":{"@type":"AggregateOffer","priceCurrency":"RUB",
+                   "lowPrice":"15999",
+                   "priceSpecification":{"price":"16999"}}}
+        </script>
+        """
+        offers = self.adapter._extract(html, "https://www.ozon.ru/search/", 20)
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(offers[0].price, 15999.0)
+
+    def test_short_query_is_not_rejected_or_truncated(self):
+        query = "tv"
+        url = self.adapter.search_url.format(query=quote_plus(" ".join(query.split())))
+        self.assertEqual(url, "https://www.ozon.ru/search/?text=tv")
+
+    def test_rejects_ambiguous_price(self):
+        html = """
+        <script type="application/ld+json">
+        {"@type":"Product","name":"Товар","url":"/product/item/",
+         "offers":{"price":"1,299.00","priceCurrency":"RUB"}}
+        </script>
+        """
+        self.assertEqual(self.adapter._extract(html, "https://www.ozon.ru/search/", 20), [])
 
 
 if __name__ == "__main__":
