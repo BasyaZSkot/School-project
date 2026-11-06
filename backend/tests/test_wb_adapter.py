@@ -57,6 +57,20 @@ class WildberriesRecordMappingTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             WildberriesAdapter.from_record_source(None)
 
+    def test_injected_source_records_are_normalized(self):
+        import asyncio
+
+        async def source(query, limit):
+            self.assertEqual(query, "кроссовки")
+            self.assertEqual(limit, 5)
+            return [{"id": 100, "name": "Кроссовки", "salePriceU": 199900}]
+
+        adapter = WildberriesAdapter.from_record_source(source)
+        result = asyncio.run(adapter.search("кроссовки", limit=5))
+        self.assertEqual(result.status.value, "ready")
+        self.assertEqual(len(result.offers), 1)
+        self.assertEqual(result.offers[0].price, 1999.0)
+
 
 if __name__ == "__main__":
     unittest.main()
