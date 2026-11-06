@@ -20,7 +20,8 @@ const providerMeta = {
 const statusMeta = {
   access_required: { label: "Нет данных", className: "status-warn" },
   policy_restricted: { label: "Нет данных", className: "status-warn" },
-  ready: { label: "Поиск завершён", className: "status-good" },
+  ready: { label: "Карточки найдены", className: "status-good" },
+  no_results: { label: "Нет карточек", className: "status-warn" },
   error: { label: "Не ответил", className: "status-error" }
 };
 function makeElement(tag, className, text) {
@@ -48,6 +49,7 @@ function renderProviders(providers = []) {
     top.append(makeElement("span", `provider-logo ${meta.className}`, meta.logo));
     top.append(makeElement("span", `status ${status.className}`, status.label));
     card.append(top, makeElement("h3", "", provider.marketplace));
+    if (provider.message) card.append(makeElement("p", "provider-message", provider.message));
     if (provider.search_url) {
       const link = makeElement("a", "provider-link", "Открыть поиск на сайте ↗");
       link.href = provider.search_url; link.target = "_blank"; link.rel = "noopener noreferrer"; card.append(link);
