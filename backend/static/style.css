@@ -135,3 +135,8 @@ h1 span { color: var(--accent); }
 .offer-product-head { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
 .offer-product-head h4 { margin:0; font-size:14px; }
 .offer-product-image { width:76px; height:76px; flex:0 0 76px; object-fit:contain; border:1px solid var(--line); border-radius:10px; background:white; }
+
+.load-more-button { display:block; margin:18px auto 0; padding:12px 22px; border:1px solid #dcd8ff; border-radius:11px; color:var(--accent); background:#fff; cursor:pointer; font-size:12px; font-weight:800; }
+.load-more-button:hover { border-color:var(--accent); background:#f8f7ff; }
+.load-more-button:disabled { opacity:.6; cursor:wait; }
+.load-more-button[hidden] { display:none; }
