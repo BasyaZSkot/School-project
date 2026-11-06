@@ -1,16 +1,14 @@
 """Best-effort parser for publicly rendered marketplace search pages.
 
-This adapter performs a normal HTTPS GET and extracts Schema.org Product data
-from JSON-LD. It does not log in, call private APIs, solve challenges, or evade
-access controls. Marketplace HTML is not a stable API, so empty results are a
-valid outcome when a page does not expose structured product data.
+Only extracts product data explicitly present in a normal public HTML response.
+It does not log in, call private APIs, solve challenges, or evade access controls.
 """
 from __future__ import annotations
 
 import json
 import re
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote_plus, urljoin, urlparse
 
 import httpx
 
@@ -48,23 +46,42 @@ def _walk(value):
             yield from _walk(item)
     elif isinstance(value, dict):
         yield value
-        graph = value.get("@graph")
-        if graph is not None:
-            yield from _walk(graph)
-        for key in ("itemListElement", "mainEntity", "mainEntityOfPage"):
+        for key in ("@graph", "itemListElement", "mainEntity", "mainEntityOfPage", "item"):
             if key in value:
                 yield from _walk(value[key])
-        item = value.get("item")
-        if item is not None:
-            yield from _walk(item)
 
 
 def _as_text(value):
     if isinstance(value, dict):
-        return value.get("name") or value.get("@id")
+        return value.get("name") or value.get("@id") or value.get("url")
     if isinstance(value, list):
         return _as_text(value[0]) if value else None
     return str(value).strip() if value is not None else None
+
+
+def _price_from_offer(offer: dict) -> float | None:
+    candidates = [offer.get("price"), offer.get("lowPrice")]
+    specification = offer.get("priceSpecification")
+    if isinstance(specification, list):
+        candidates.extend(
+            item.get("price") for item in specification if isinstance(item, dict)
+        )
+    elif isinstance(specification, dict):
+        candidates.append(specification.get("price"))
+    for value in candidates:
+        if value is None or value == "":
+            continue
+        # Keep decimal separators and digits only; reject ambiguous multiple separators.
+        raw = re.sub(r"[^0-9.,]", "", str(value))
+        if raw.count(",") + raw.count(".") > 1:
+            continue
+        try:
+            price = float(raw.replace(",", "."))
+        except ValueError:
+            continue
+        if price > 0:
+            return price
+    return None
 
 
 class PublicHtmlSearchAdapter:
@@ -96,65 +113,68 @@ class PublicHtmlSearchAdapter:
             for item in _walk(document):
                 kind = item.get("@type", [])
                 kinds = kind if isinstance(kind, list) else [kind]
-                if not any(str(k).lower().endswith("product") for k in kinds):
+                if not any(str(k).lower().rstrip("/").endswith("product") for k in kinds):
                     continue
                 title = _as_text(item.get("name"))
                 raw_url = _as_text(item.get("url") or item.get("@id"))
                 product_url = self._valid_marketplace_url(raw_url, page_url) if raw_url else None
                 raw_offers = item.get("offers")
-                if isinstance(raw_offers, list):
-                    raw_offers = raw_offers[0] if raw_offers else None
-                if not isinstance(raw_offers, dict):
+                offer_list = raw_offers if isinstance(raw_offers, list) else [raw_offers]
+                if not isinstance(raw_offers, (dict, list)):
                     continue
-                price_value = raw_offers.get("price") or raw_offers.get("lowPrice")
-                try:
-                    price = float(re.sub(r"[^0-9.,]", "", str(price_value)).replace(",", "."))
-                except (TypeError, ValueError):
-                    continue
-                if not title or not product_url or price <= 0 or product_url in seen:
-                    continue
-                currency = str(raw_offers.get("priceCurrency") or "RUB").upper()
-                if len(currency) != 3 or not currency.isalpha():
-                    currency = "RUB"
-                image = item.get("image")
-                if isinstance(image, list):
-                    image = image[0] if image else None
-                if isinstance(image, dict):
-                    image = image.get("url")
-                image_url = urljoin(page_url, str(image)) if image else None
-                if image_url and urlparse(image_url).scheme != "https":
-                    image_url = None
-                brand = _as_text(item.get("brand"))
-                availability = str(raw_offers.get("availability") or "").lower()
-                in_stock = True if "instock" in availability else False if "outofstock" in availability else None
-                offers.append(Offer(
-                    marketplace=self.marketplace,
-                    title=title,
-                    price=price,
-                    currency=currency,
-                    url=product_url,
-                    external_id=str(item.get("sku") or item.get("productID") or "") or None,
-                    brand=brand,
-                    gtin=str(item.get("gtin13") or item.get("gtin") or "") or None,
-                    in_stock=in_stock,
-                    image_url=image_url,
-                ))
-                seen.add(product_url)
-                if len(offers) >= limit:
-                    return offers
+                for raw_offer in offer_list:
+                    if not isinstance(raw_offer, dict):
+                        continue
+                    price = _price_from_offer(raw_offer)
+                    if not title or not product_url or price is None or product_url in seen:
+                        continue
+                    currency = str(raw_offer.get("priceCurrency") or "RUB").upper()
+                    if len(currency) != 3 or not currency.isalpha():
+                        currency = "RUB"
+                    image = item.get("image")
+                    if isinstance(image, list):
+                        image = image[0] if image else None
+                    if isinstance(image, dict):
+                        image = image.get("url")
+                    image_url = urljoin(page_url, str(image)) if image else None
+                    if image_url and urlparse(image_url).scheme != "https":
+                        image_url = None
+                    brand = _as_text(item.get("brand"))
+                    availability = str(raw_offer.get("availability") or "").lower()
+                    in_stock = True if "instock" in availability else False if "outofstock" in availability else None
+                    offers.append(Offer(
+                        marketplace=self.marketplace,
+                        title=title,
+                        price=price,
+                        currency=currency,
+                        url=product_url,
+                        external_id=str(item.get("sku") or item.get("productID") or "") or None,
+                        brand=brand,
+                        gtin=str(item.get("gtin13") or item.get("gtin") or "") or None,
+                        in_stock=in_stock,
+                        image_url=image_url,
+                    ))
+                    seen.add(product_url)
+                    if len(offers) >= limit:
+                        return offers
         return offers
 
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
-        from urllib.parse import quote_plus
         if not query.strip():
             raise ValueError("Search query must not be empty")
         if not 1 <= limit <= 50:
             raise ValueError("limit must be between 1 and 50")
-        url = self.search_url.format(query=quote_plus(query))
+        # Normalize whitespace without imposing a minimum query length.
+        clean_query = " ".join(query.split())
+        url = self.search_url.format(query=quote_plus(clean_query))
         headers = {
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.7",
-            "User-Agent": "MultiMarket/1.0 (public search page reader)",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            ),
         }
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)
