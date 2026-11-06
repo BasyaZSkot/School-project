@@ -96,7 +96,7 @@ class _MicrodataProductParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         itemtype = attrs.get("itemtype", "").lower()
-        if attrs.get("itemscope") is not None and "schema.org/product" in itemtype:
+        if "itemscope" in attrs and "schema.org/product" in itemtype:
             if self._current is not None:
                 self.products.append(self._current)
             self._current = {}
