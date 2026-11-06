@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import AsyncMock
 
-from src.parcers.wb_adapter import wb_record_to_offer
+from src.parcers.wb_adapter import WildberriesAdapter, wb_record_to_offer
 
 
 class WildberriesRecordMappingTests(unittest.TestCase):
@@ -42,6 +43,19 @@ class WildberriesRecordMappingTests(unittest.TestCase):
             "sizes": [{"price": {"product": 123450}}],
         })
         self.assertEqual(offer.price, 1234.5)
+
+    def test_adapter_accepts_an_explicit_approved_async_source(self):
+        source = AsyncMock(return_value=[{
+            "id": 99,
+            "name": "Source item",
+            "salePriceU": 159900,
+        }])
+        adapter = WildberriesAdapter.from_record_source(source)
+        self.assertIs(adapter.source, source)
+
+    def test_factory_rejects_non_callable_source(self):
+        with self.assertRaises(TypeError):
+            WildberriesAdapter.from_record_source(None)
 
 
 if __name__ == "__main__":
