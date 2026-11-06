@@ -40,7 +40,7 @@ class MarketplaceApiTests(unittest.TestCase):
         self.assertEqual(payload["total_offers"], 0)
         self.assertEqual(payload["products"], [])
         self.assertTrue(all(provider["search_url"].startswith("https://") for provider in payload["providers"]))
-        mocked.assert_awaited_once_with("кофемашина", 20)
+        mocked.assert_awaited_once_with("кофемашина", 20, 0)
 
     def test_search_rejects_blank_and_invalid_limit(self):
         self.assertEqual(self.client.get("/api/search", params={"q": "   "}).status_code, 400)
@@ -50,6 +50,13 @@ class MarketplaceApiTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("MultiMarket", response.text)
+
+    def test_navigation_pages_are_served_separately(self):
+        for path in ("/monitoring", "/history", "/sources"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("<html", response.text)
 
 
 if __name__ == "__main__":

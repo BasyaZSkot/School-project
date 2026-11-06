@@ -39,8 +39,8 @@ class MarketplaceSearchService:
             raise ValueError("Search query must not be empty")
         if not 1 <= limit <= 50:
             raise ValueError("limit must be between 1 and 50")
-        if not 0 <= offset <= 100:
-            raise ValueError("offset must be between 0 and 100")
+        if not 0 <= offset <= 150:
+            raise ValueError("offset must be between 0 and 150")
 
         # Fetch enough records from each provider to assemble the requested
         # global page after cross-marketplace grouping and deduplication.

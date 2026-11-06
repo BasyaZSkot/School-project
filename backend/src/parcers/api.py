@@ -72,6 +72,21 @@ async def home():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/monitoring", include_in_schema=False)
+async def monitoring_page():
+    return FileResponse(STATIC_DIR / "monitoring.html")
+
+
+@app.get("/history", include_in_schema=False)
+async def history_page():
+    return FileResponse(STATIC_DIR / "history.html")
+
+
+@app.get("/sources", include_in_schema=False)
+async def sources_page():
+    return FileResponse(STATIC_DIR / "sources.html")
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "MultiMarket", "version": app.version}
@@ -81,7 +96,7 @@ async def health():
 async def search(
     q: str = Query(min_length=1, max_length=160, description="Название товара"),
     limit: int = Query(default=20, ge=1, le=50),
-    offset: int = Query(default=0, ge=0, le=100),
+    offset: int = Query(default=0, ge=0, le=150),
 ):
     try:
         return await search_service.search(q, limit, offset)

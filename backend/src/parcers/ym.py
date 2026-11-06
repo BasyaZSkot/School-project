@@ -1,9 +1,9 @@
 import os
 import re
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from .base import Offer
+from .base import Offer, SearchStatus
 from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter, _price_from_offer
 
@@ -66,6 +66,49 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
     marketplace = "Яндекс Маркет"
     base_search_url = "https://market.yandex.ru/search?text={query}"
     allowed_hosts = ("market.yandex.ru",)
+
+    async def search(self, query: str, limit: int = 20):
+        result = await super().search(query, limit)
+        if result.status != SearchStatus.READY or len(result.offers) >= limit:
+            return result
+
+        offers = list(result.offers)
+        seen = {offer.external_id or offer.url for offer in offers}
+        base = urlparse(result.search_url)
+        for page in range(2, 6):
+            query_items = [
+                (key, value) for key, value in parse_qsl(base.query, keep_blank_values=True)
+                if key != "page"
+            ]
+            query_items.append(("page", str(page)))
+            page_url = urlunparse(base._replace(query=urlencode(query_items)))
+            try:
+                final_url, html = await self._fetch_public_page(page_url)
+            except Exception:
+                result.message = "Дополнительные страницы недоступны; показаны уже найденные товары."
+                break
+
+            remaining = limit - len(offers)
+            page_offers = self._extract(html, final_url, remaining)
+            added = [
+                offer for offer in page_offers
+                if (offer.external_id or offer.url) not in seen
+            ]
+            if not added:
+                break
+            for offer in added:
+                identity = offer.external_id or offer.url
+                seen.add(identity)
+                offers.append(offer)
+                if len(offers) >= limit:
+                    break
+            if len(offers) >= limit:
+                break
+
+        result.offers = offers[:limit]
+        if len(result.offers) < limit and result.message is None:
+            result.message = "Показаны карточки с доступных публичных страниц поиска."
+        return result
 
     def _extract_product(self, html: str, page_url: str):
         parser = _YandexProductStateParser()

@@ -56,7 +56,7 @@ class SearchPaginationTests(unittest.TestCase):
     def test_rejects_offset_above_supported_range(self):
         service = MarketplaceSearchService(adapters=[])
         with self.assertRaises(ValueError):
-            asyncio.run(service.search("phone", limit=20, offset=101))
+            asyncio.run(service.search("phone", limit=20, offset=151))
 
 
 if __name__ == "__main__":

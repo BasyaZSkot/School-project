@@ -9,12 +9,13 @@
 - Currency-aware price grouping: RUB and USD are never compared as if they were the same unit.
 - Wildberries source-compatible record mapping in `wb_adapter.py`, including nested size prices and kopecks-to-rubles conversion.
 - Optional normalized JSON partner-feed adapters configured by environment variables.
-- FastAPI endpoints and responsive Russian-language search UI.
+- FastAPI endpoints and a responsive Russian-language UI with separate search, monitoring, history, and sources pages.
+- Search returns up to 20 unique products initially and supports loading further pages. Yandex search reads subsequent public HTML pages when needed.
 - Unit/API tests and a GitHub Actions workflow.
 
 ## Live data status
 
-When no partner feed is configured, each default adapter makes one best-effort HTTPS request to that marketplace's public search page and reads only product data already embedded in the returned HTML. Price monitors revisit the selected public product page and use embedded state, Schema.org data, or the marketplace's public HTML fields when available. The service does not log in, reuse browser cookies, call undocumented private APIs, solve CAPTCHA, or evade access controls. Public pages can omit product data or restrict automated requests, so live results are not guaranteed. A configured licensed/partner JSON feed takes precedence for its marketplace.
+When no partner feed is configured, each default adapter reads only product data embedded in public HTTPS search pages. The Yandex adapter can request additional public result pages when the current page has fewer cards than requested. Price monitors revisit the selected public product page and use embedded state, Schema.org data, or the marketplace's public HTML fields when available. The service does not log in, reuse browser cookies, call undocumented private APIs, solve CAPTCHA, or evade access controls. Public pages can omit product data or restrict automated requests, so live results are not guaranteed. A configured licensed/partner JSON feed takes precedence for its marketplace.
 
 A live feed must return this shape:
 
