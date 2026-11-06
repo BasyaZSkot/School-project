@@ -81,9 +81,10 @@ async def health():
 async def search(
     q: str = Query(min_length=1, max_length=160, description="Название товара"),
     limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0, le=100),
 ):
     try:
-        return await search_service.search(q, limit)
+        return await search_service.search(q, limit, offset)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
