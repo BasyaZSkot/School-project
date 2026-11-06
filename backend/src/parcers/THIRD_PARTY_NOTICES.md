@@ -32,10 +32,10 @@ SOFTWARE.
 
 Source: https://github.com/prog-time/grex
 
-Reviewed as a reference for marketplace-specific parser separation and field normalization. No Grex source code is imported by the public-page adapter. Browser cookie capture, private API interception, proxy rotation, and CAPTCHA retry mechanisms are intentionally not included.
+Reviewed as a technical reference for marketplace-specific field handling. GitHub does not declare a license for this repository, so no Grex source code is copied or redistributed. Browser cookie capture, private API interception, proxy rotation, and CAPTCHA retry mechanisms are intentionally not included.
 
 ## Duff89/wb_parse_search_phrase
 
 Source: https://github.com/Duff89/wb_parse_search_phrase
 
-The repository's search-result shape and WB price fields informed the normalized WB record mapping. The original standalone fetcher in `wb_parse_search_phrase-master` is not called by MultiMarket's live search adapter. Its internal endpoint, cookie handling, and proxy settings are not enabled by the aggregator.
+The repository was reviewed for its Item field names and price representation. GitHub does not declare a license for this repository, so no source files are copied or redistributed. MultiMarket's `wb_record_to_offer` is an independently implemented mapper for compatible records; it converts kopecks to RUB, reads nested size prices and maps available stock/image fields. The standalone fetcher, internal endpoint, cookie handling, and proxy settings are not called by the live search adapter.
