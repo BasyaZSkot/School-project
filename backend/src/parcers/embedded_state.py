@@ -43,9 +43,9 @@ class _StateScriptParser(HTMLParser):
 
 
 _STATE_ASSIGNMENT = re.compile(
-    r"(?:window\\s*\\.\\s*)?"
+    r"(?:window\s*\.\s*)?"
     r"(?:__INITIAL_STATE__|__PRELOADED_STATE__|__NEXT_DATA__|__NUXT__|__APP_STATE__)"
-    r"\\s*=\\s*",
+    r"\s*=\s*",
     re.IGNORECASE,
 )
 
@@ -66,7 +66,7 @@ def _json_value_at(source: str, start: int) -> Any | None:
         if in_string:
             if escaped:
                 escaped = False
-            elif char == "\\\\":
+            elif char == "\\":
                 escaped = True
             elif char == '"':
                 in_string = False
@@ -206,7 +206,7 @@ def _ozon_price(card: dict) -> float | None:
     )
     if not isinstance(active, str):
         return None
-    digits = re.sub(r"[^\\d]", "", active)
+    digits = re.sub(r"[^\d]", "", active)
     try:
         value = float(digits)
     except ValueError:
@@ -243,7 +243,7 @@ def _ozon_sku(card: dict) -> str | None:
 
 
 def _ozon_sku_from_url(url: str) -> str | None:
-    match = re.search(r"-(\\d+)/?$", url) or re.search(r"(\\d{6,})", url)
+    match = re.search(r"-(\d+)/?$", url) or re.search(r"(\d{6,})", url)
     return match.group(1) if match else None
 
 
