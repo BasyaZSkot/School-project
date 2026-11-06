@@ -1,7 +1,7 @@
-"""Extract marketplace-specific product state already embedded in public HTML.
+"""Extract marketplace product state already present in public HTML.
 
-No network requests are made here. In particular, this module does not call
-private marketplace endpoints, obtain browser cookies, or automate challenges.
+The parser reads JSON documents and JSON-valued state assignments from ordinary
+public page scripts. It never evaluates JavaScript or makes follow-up requests.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .wb_adapter import wb_record_to_offer
 
 
 class _StateScriptParser(HTMLParser):
-    """Collect JSON script payloads included in the HTML document."""
+    """Collect script contents; JavaScript is inspected as text, never executed."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -25,16 +25,8 @@ class _StateScriptParser(HTMLParser):
         self.documents: list[str] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
-        if tag.lower() != "script":
-            return
-        values = dict(attrs)
-        script_type = (values.get("type") or "").lower()
-        script_id = (values.get("id") or "").lower()
-        self._capture = (
-            "json" in script_type
-            or script_id in {"__next_data__", "__initial_state__", "initial-state", "app-state"}
-        )
-        if self._capture:
+        if tag.lower() == "script":
+            self._capture = True
             self._parts = []
 
     def handle_data(self, data: str) -> None:
@@ -50,17 +42,75 @@ class _StateScriptParser(HTMLParser):
             self._parts = []
 
 
+_STATE_ASSIGNMENT = re.compile(
+    r"(?:window\\s*\\.\\s*)?"
+    r"(?:__INITIAL_STATE__|__PRELOADED_STATE__|__NEXT_DATA__|__NUXT__|__APP_STATE__)"
+    r"\\s*=\\s*",
+    re.IGNORECASE,
+)
+
+
+def _json_value_at(source: str, start: int) -> Any | None:
+    """Decode one object/array literal with a small string-aware bracket scanner."""
+    while start < len(source) and source[start].isspace():
+        start += 1
+    if start >= len(source) or source[start] not in "{[":
+        return None
+    opening = source[start]
+    closing = "}" if opening == "{" else "]"
+    stack = [closing]
+    in_string = False
+    escaped = False
+    for index in range(start + 1, len(source)):
+        char = source[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            stack.append("}")
+        elif char == "[":
+            stack.append("]")
+        elif char in "}]":
+            if not stack or char != stack[-1]:
+                return None
+            stack.pop()
+            if not stack:
+                try:
+                    return json.loads(source[start:index + 1])
+                except (json.JSONDecodeError, TypeError):
+                    return None
+    return None
+
+
 def embedded_json_documents(html: str) -> list[Any]:
-    """Return parseable JSON documents found in explicit JSON script tags."""
+    """Return JSON payloads embedded in script tags, including common state assignments."""
     parser = _StateScriptParser()
     parser.feed(html)
     parser.close()
     documents: list[Any] = []
+    seen: set[str] = set()
     for raw in parser.documents:
+        candidates: list[Any] = []
         try:
-            documents.append(json.loads(raw))
+            candidates.append(json.loads(raw))
         except (json.JSONDecodeError, TypeError):
-            continue
+            pass
+        for match in _STATE_ASSIGNMENT.finditer(raw):
+            value = _json_value_at(raw, match.end())
+            if value is not None:
+                candidates.append(value)
+        for value in candidates:
+            fingerprint = json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
+            if fingerprint not in seen:
+                seen.add(fingerprint)
+                documents.append(value)
     return documents
 
 
@@ -86,7 +136,7 @@ def _nodes(value: Any, depth: int = 0):
 
 
 def extract_wildberries_embedded(html: str, limit: int) -> list[Offer]:
-    """Read WB products only from a JSON payload embedded in the public page."""
+    """Read WB products only from data embedded in the public page."""
     offers: list[Offer] = []
     seen: set[str] = set()
     for document in embedded_json_documents(html):
@@ -149,8 +199,6 @@ def _ozon_price(card: dict) -> float | None:
         None,
     )
     prices = price_block.get("price", []) if isinstance(price_block, dict) else []
-    # Ozon marks the active price explicitly; do not accidentally use
-    # ORIGINAL_PRICE when the discounted PRICE is also present.
     active = next(
         (item.get("text") for item in prices
          if isinstance(item, dict) and item.get("textStyle") == "PRICE"),
@@ -158,7 +206,7 @@ def _ozon_price(card: dict) -> float | None:
     )
     if not isinstance(active, str):
         return None
-    digits = re.sub(r"[^\d]", "", active)
+    digits = re.sub(r"[^\\d]", "", active)
     try:
         value = float(digits)
     except ValueError:
@@ -195,12 +243,12 @@ def _ozon_sku(card: dict) -> str | None:
 
 
 def _ozon_sku_from_url(url: str) -> str | None:
-    match = re.search(r"-(\d+)/?$", url) or re.search(r"(\d{6,})", url)
+    match = re.search(r"-(\\d+)/?$", url) or re.search(r"(\\d{6,})", url)
     return match.group(1) if match else None
 
 
 def extract_ozon_embedded(html: str, page_url: str, allowed_url) -> list[Offer]:
-    """Read tileGridDesktop search cards from widgetStates embedded in public HTML."""
+    """Read Ozon search cards from widgetStates embedded in public page scripts."""
     offers: list[Offer] = []
     seen: set[str] = set()
     for document in embedded_json_documents(html):
