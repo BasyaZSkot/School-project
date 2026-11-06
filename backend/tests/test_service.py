@@ -1,6 +1,8 @@
 import asyncio
 import unittest
 
+import httpx
+
 from src.parcers.base import Offer, ProviderResult, SearchStatus
 from src.parcers.service import MarketplaceSearchService
 
@@ -73,6 +75,20 @@ class MarketplaceSearchServiceTests(unittest.IsolatedAsyncioTestCase):
         ).search("item")
         self.assertEqual(result["providers"][0]["status"], "error")
         self.assertIn("timeout", result["providers"][0]["message"])
+
+    async def test_access_restriction_is_reported_without_retrying(self):
+        request = httpx.Request("GET", "https://www.wildberries.ru/search")
+        response = httpx.Response(498, request=request)
+        error = httpx.HTTPStatusError("blocked", request=request, response=response)
+
+        class RestrictedAdapter(FakeAdapter):
+            async def search(self, query, limit=20):
+                raise error
+
+        result = await MarketplaceSearchService([RestrictedAdapter("Wildberries")]).search("tv")
+        self.assertEqual(result["providers"][0]["status"], "policy_restricted")
+        self.assertIn("498", result["providers"][0]["message"])
+        self.assertIn("https://", result["providers"][0]["search_url"])
 
     async def test_rejects_empty_query_and_invalid_limit(self):
         service = MarketplaceSearchService([])
