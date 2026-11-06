@@ -8,6 +8,7 @@ from src.parcers.service import MarketplaceSearchService
 
 
 class FakeAdapter:
+    search_url = "https://example.org/search?q={query}"
     def __init__(self, marketplace, offers=None, delay=0, fail=False):
         self.marketplace = marketplace
         self.offers = offers or []
