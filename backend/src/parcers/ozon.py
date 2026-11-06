@@ -1,4 +1,7 @@
+import os
+
 from .embedded_state import extract_ozon_embedded
+from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter
 
 
@@ -21,6 +24,16 @@ class OzonAdapter(PublicHtmlSearchAdapter):
 
     @classmethod
     def from_env(cls):
+        feed_url = os.getenv("MULTIMARKET_OZON_FEED_URL", "").strip()
+        if feed_url:
+            return JsonFeedAdapter(
+                marketplace=cls.marketplace,
+                base_search_url=cls.base_search_url,
+                reason="Подключён разрешённый партнёрский источник Ozon.",
+                feed_url=feed_url,
+                token=os.getenv("MULTIMARKET_OZON_FEED_TOKEN", "").strip() or None,
+                allowed_hosts=cls.allowed_hosts,
+            )
         return cls(
             marketplace=cls.marketplace,
             search_url=cls.base_search_url,

@@ -35,6 +35,11 @@ function makeElement(tag, className, text) {
   if (text !== undefined) element.textContent = text;
   return element;
 }
+function formatPrice(value, currency = "RUB") {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency", currency, maximumFractionDigits: 2
+  }).format(value);
+}
 function setLoading(loading) {
   searchButton.disabled = loading;
   searchButton.innerHTML = loading ? '<span class="spinner"></span><span>Ищем…</span>' : '<span>Найти</span><span aria-hidden="true">→</span>';
@@ -81,6 +86,29 @@ function renderOffers(products = [], query = "", append = false) {
   if (!products.length && !append) { offersWrap.hidden = true; return; }
   offersWrap.hidden = false;
   for (const product of products) {
+    const productOffers = Array.isArray(product.offers) ? product.offers : [];
+    const pricesByCurrency = new Map();
+    for (const offer of productOffers) {
+      const price = Number(offer.price);
+      const currency = offer.currency || "RUB";
+      if (!Number.isFinite(price) || price <= 0) continue;
+      if (!pricesByCurrency.has(currency)) pricesByCurrency.set(currency, []);
+      pricesByCurrency.get(currency).push(price);
+    }
+    const minimumByCurrency = new Map();
+    const comparisonParts = [];
+    for (const [currency, prices] of pricesByCurrency) {
+      const minimum = Math.min(...prices);
+      const maximum = Math.max(...prices);
+      minimumByCurrency.set(currency, minimum);
+      if (prices.length > 1 && maximum > minimum) {
+        const difference = maximum - minimum;
+        const percent = difference / maximum * 100;
+        comparisonParts.push(
+          formatPrice(difference, currency) + " (" + percent.toFixed(1) + "%)"
+        );
+      }
+    }
     const card = makeElement("article", "offer-card");
     const heading = makeElement("div", "offer-product-head");
     const firstImage = (product.offers || []).find(item => item.image_url)?.image_url;
@@ -91,14 +119,29 @@ function renderOffers(products = [], query = "", append = false) {
     }
     heading.append(makeElement("h4", "", product.title || "Товар"));
     card.append(heading);
+    if (comparisonParts.length) {
+      card.append(makeElement(
+        "p", "price-comparison",
+        "Разница между предложениями: " + comparisonParts.join(" · ")
+      ));
+    }
     const list = makeElement("div", "offer-rows");
-    for (const offer of product.offers || []) {
+    for (const offer of productOffers) {
       visibleOfferCount += 1;
       const row = makeElement("div", "offer-row");
       const info = makeElement("div", "offer-info");
       info.append(makeElement("strong", "", offer.marketplace), makeElement("span", "", offer.title));
-      const price = makeElement("strong", "offer-price",
-        new Intl.NumberFormat("ru-RU", { style: "currency", currency: offer.currency || "RUB", maximumFractionDigits: 0 }).format(offer.price));
+      const currency = offer.currency || "RUB";
+      const offerPrice = Number(offer.price);
+      const lowestPrice = minimumByCurrency.get(currency);
+      const sameCurrencyPrices = pricesByCurrency.get(currency) || [];
+      if (sameCurrencyPrices.length > 1 && Number.isFinite(offerPrice) && offerPrice === lowestPrice) {
+        info.append(makeElement("span", "best-price-badge", "Самая низкая цена"));
+      }
+      const priceText = Number.isFinite(offerPrice) && offerPrice > 0
+        ? formatPrice(offerPrice, currency)
+        : "Цена недоступна";
+      const price = makeElement("strong", "offer-price", priceText);
       row.append(info, price);
       const actions = makeElement("div", "offer-actions");
       if (offer.url) {

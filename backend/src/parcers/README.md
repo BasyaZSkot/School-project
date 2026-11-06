@@ -14,7 +14,7 @@
 
 ## Live data status
 
-No marketplace is scraped automatically by default. The WB example code uses undocumented internal browser endpoints and browser-cookie acquisition. That transport is not wired into MultiMarket. The reusable WB record mapper accepts an injected approved source, and all three providers can accept a licensed/partner JSON feed.
+When no partner feed is configured, each default adapter makes one best-effort HTTPS request to that marketplace's public search page and reads only product data already embedded in the returned HTML. It does not log in, reuse browser cookies, call undocumented private APIs, solve CAPTCHA, or evade access controls. Public pages can omit product data or restrict automated requests, so live results are not guaranteed. A configured licensed/partner JSON feed takes precedence for its marketplace. The WB record mapper supports approved feeds in the source record format without using the referenced parser's transport.
 
 A live feed must return this shape:
 

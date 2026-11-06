@@ -196,8 +196,8 @@ async def send_telegram_alert(alert: dict[str, Any], monitor: dict[str, Any]) ->
     direction = "снизилась" if alert["change_percent"] < 0 else "выросла"
     message = (
         f"MultiMarket: цена товара «{monitor['title']}» {direction} на "
-        f"{abs(alert['change_percent']):.1f}%\\n"
-        f"{alert['old_price']:.2f} → {alert['new_price']:.2f} {alert['currency']}\\n"
+        f"{abs(alert['change_percent']):.1f}%\n"
+        f"{alert['old_price']:.2f} → {alert['new_price']:.2f} {alert['currency']}\n"
         f"{monitor['product_url']}"
     )
     try:

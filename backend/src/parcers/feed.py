@@ -29,6 +29,7 @@ class JsonFeedAdapter(DisabledAdapter):
         timeout: float = 8.0,
         records_key: str = "offers",
         record_mapper: Callable[[Any], Offer | None] | None = None,
+        allowed_hosts: tuple[str, ...] = (),
     ):
         parsed = urlparse(feed_url)
         if parsed.scheme != "https" or not parsed.netloc:
@@ -41,13 +42,22 @@ class JsonFeedAdapter(DisabledAdapter):
         self.timeout = timeout
         self.records_key = records_key
         self.record_mapper = record_mapper
+        self.allowed_hosts = tuple(host.lower() for host in allowed_hosts)
         self.status = SearchStatus.ACCESS_REQUIRED
+
+    def _is_allowed_marketplace_url(self, value: str) -> bool:
+        parsed = urlparse(value)
+        if parsed.scheme != "https" or not parsed.hostname:
+            return False
+        return not self.allowed_hosts or any(
+            parsed.hostname == host or parsed.hostname.endswith("." + host)
+            for host in self.allowed_hosts
+        )
 
     def _map_offer(self, item: dict) -> Offer | None:
         try:
-            product_url = str(item["url"])
-            parsed = urlparse(product_url)
-            if parsed.scheme != "https" or not parsed.netloc:
+            product_url = str(item["url"]).strip()
+            if not self._is_allowed_marketplace_url(product_url):
                 return None
             image_url = item.get("image_url")
             if image_url:
@@ -101,6 +111,11 @@ class JsonFeedAdapter(DisabledAdapter):
                 offer = self._map_offer(record)
             else:
                 offer = None
+            if offer is not None and (
+                offer.marketplace != self.marketplace
+                or not self._is_allowed_marketplace_url(offer.url)
+            ):
+                offer = None
             if offer is not None:
                 offers.append(offer)
             if len(offers) >= limit:
@@ -108,7 +123,7 @@ class JsonFeedAdapter(DisabledAdapter):
 
         return ProviderResult(
             marketplace=self.marketplace,
-            status=SearchStatus.READY,
+            status=SearchStatus.READY if offers else SearchStatus.NO_RESULTS,
             search_url=self.build_search_url(query),
             offers=offers,
             message=None if offers else "Источник ответил, но предложений не найдено.",
