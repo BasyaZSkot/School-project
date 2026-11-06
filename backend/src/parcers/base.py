@@ -11,6 +11,7 @@ import unicodedata
 
 class SearchStatus(str, Enum):
     READY = "ready"
+    NO_RESULTS = "no_results"
     ACCESS_REQUIRED = "access_required"
     POLICY_RESTRICTED = "policy_restricted"
     ERROR = "error"
