@@ -99,5 +99,31 @@ class EmbeddedMarketplaceSearchStateTests(unittest.TestCase):
         self.assertEqual(embedded_json_documents(html), [])
 
 
+    def test_reads_wildberries_products_from_common_inline_state_assignment(self):
+        state = {
+            "products": [{
+                "id": 654321,
+                "name": "Мышь Example",
+                "sizes": [{"price": {"product": 259900}}],
+                "totalQuantity": 2,
+            }]
+        }
+        html = (
+            "<html><script>window.__INITIAL_STATE__ = "
+            + json.dumps(state, ensure_ascii=False)
+            + ";</script></html>"
+        )
+
+        offers = extract_wildberries_embedded(html, 10)
+
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(offers[0].title, "Мышь Example")
+        self.assertEqual(offers[0].price, 2599.0)
+        self.assertEqual(
+            offers[0].url,
+            "https://www.wildberries.ru/catalog/654321/detail.aspx",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
