@@ -44,8 +44,8 @@ class EmbeddedMarketplaceSearchStateTests(unittest.TestCase):
                 "sku": "ozon-777",
                 "action": {"link": "/product/headphones-777/"},
                 "mainState": [
-                    {"id": "name", "text": "Наушники Example"},
-                    {"type": "priceV2", "price": [{"text": "4 590 ₽"}]},
+                    {"id": "name", "textDS": {"text": "Наушники Example"}},
+                    {"type": "priceV2", "price": [{"text": "4 590 ₽", "textStyle": "PRICE"}]},
                     {"gallery": [{"src": "https://cdn1.ozon.ru/s3/headphones.jpg"}]},
                 ],
             }]
@@ -74,8 +74,8 @@ class EmbeddedMarketplaceSearchStateTests(unittest.TestCase):
                 "sku": "external",
                 "action": {"link": "https://outside.example/item"},
                 "mainState": [
-                    {"id": "name", "text": "Чужой товар"},
-                    {"type": "priceV2", "price": [{"text": "100 ₽"}]},
+                    {"id": "name", "textDS": {"text": "Чужой товар"}},
+                    {"type": "priceV2", "price": [{"text": "100 ₽", "textStyle": "PRICE"}]},
                 ],
             }]
         }
