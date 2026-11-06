@@ -9,7 +9,7 @@ import json
 import re
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from .base import Offer
 from .wb_adapter import wb_record_to_offer
