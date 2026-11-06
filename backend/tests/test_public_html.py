@@ -64,6 +64,24 @@ class PublicMarketplaceHtmlTests(unittest.TestCase):
         self.assertEqual(len(offers), 1)
         self.assertEqual(offers[0].price, 15999.0)
 
+
+    def test_extracts_schema_microdata_when_jsonld_is_missing(self):
+        html = """
+        <article itemscope itemtype="https://schema.org/Product">
+          <span itemprop="name">Чайник Example</span>
+          <a itemprop="url" href="/product/kettle/"></a>
+          <span itemprop="price" content="3490"></span>
+          <meta itemprop="priceCurrency" content="RUB">
+          <img itemprop="image" src="https://cdn.ozon.ru/kettle.webp">
+        </article>
+        """
+        offers = self.adapter._extract(html, "https://www.ozon.ru/search/", 20)
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(offers[0].title, "Чайник Example")
+        self.assertEqual(offers[0].price, 3490.0)
+        self.assertEqual(offers[0].url, "https://www.ozon.ru/product/kettle/")
+        self.assertEqual(offers[0].image_url, "https://cdn.ozon.ru/kettle.webp")
+
     def test_short_query_is_not_rejected_or_truncated(self):
         query = "tv"
         url = self.adapter.search_url.format(query=quote_plus(" ".join(query.split())))
