@@ -101,6 +101,18 @@ class WildberriesAdapter(DisabledAdapter):
     def __init__(self, source: RecordSource | None = None):
         self.source = source
 
+    @classmethod
+    def from_record_source(cls, source: RecordSource) -> "WildberriesAdapter":
+        """Build an adapter around an explicitly approved async WB data source.
+
+        The callable must return records compatible with the public Item-like
+        schema. Network transport, authorization and rate limiting remain the
+        responsibility of the approved source integration.
+        """
+        if not callable(source):
+            raise TypeError("source must be an async callable")
+        return cls(source=source)
+
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         if self.source is None:
             return await super().search(query, limit)
