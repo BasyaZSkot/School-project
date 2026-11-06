@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 
+import httpx
+
 from .base import Offer, SearchAdapter, normalize_title, offer_group_key
 from .ozon import OzonAdapter
 from .wb import WildberriesAdapter
@@ -44,14 +46,23 @@ class MarketplaceSearchService:
                     search_url = adapter.search_url.format(query=quote_plus(query))
                 elif hasattr(adapter, "build_search_url"):
                     search_url = adapter.build_search_url(query)
-                message = (
-                    "timeout: площадка не ответила за отведённое время."
-                    if isinstance(result, asyncio.TimeoutError)
-                    else "Площадка временно не ответила. Попробуйте ещё раз."
-                )
+                status = "error"
+                if isinstance(result, asyncio.TimeoutError):
+                    message = "timeout: площадка не ответила за отведённое время."
+                elif isinstance(result, httpx.HTTPStatusError):
+                    code = result.response.status_code
+                    if code in (401, 403, 429, 498):
+                        status = "policy_restricted"
+                        message = f"HTTP {code}: площадка ограничила автоматический запрос; откройте поиск на сайте."
+                    else:
+                        message = f"HTTP {code}: площадка временно не ответила."
+                elif isinstance(result, httpx.RequestError):
+                    message = "Сетевая ошибка при обращении к площадке."
+                else:
+                    message = "Площадка временно не ответила. Попробуйте ещё раз."
                 provider_results.append({
                     "marketplace": adapter.marketplace,
-                    "status": "error",
+                    "status": status,
                     "search_url": search_url,
                     "offers": [],
                     "message": message,
