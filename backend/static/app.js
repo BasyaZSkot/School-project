@@ -9,6 +9,11 @@ const notice = document.querySelector("#notice");
 const offersWrap = document.querySelector("#offers-wrap");
 const offersList = document.querySelector("#offers-list");
 const offersCaption = document.querySelector("#offers-caption");
+const loadMoreButton = document.querySelector("#load-more-button");
+let activeQuery = "";
+let nextOffset = 0;
+let visibleOfferCount = 0;
+let visibleProductCount = 0;
 const monitorList = document.querySelector("#monitor-list");
 const monitorNotice = document.querySelector("#monitor-notice");
 
@@ -56,7 +61,6 @@ function renderProviders(providers = []) {
     }
     providerGrid.append(card);
   }
-  count.textContent = `${providers.length} площадки`;
 }
 async function addMonitor(offer, query) {
   const response = await fetch("/api/monitors", {
@@ -68,11 +72,14 @@ async function addMonitor(offer, query) {
   await loadMonitors();
   showMessage(monitorNotice, "Товар добавлен в мониторинг.");
 }
-function renderOffers(products = [], query = "") {
-  offersList.replaceChildren();
-  if (!products.length) { offersWrap.hidden = true; return; }
+function renderOffers(products = [], query = "", append = false) {
+  if (!append) {
+    offersList.replaceChildren();
+    visibleOfferCount = 0;
+    visibleProductCount = 0;
+  }
+  if (!products.length && !append) { offersWrap.hidden = true; return; }
   offersWrap.hidden = false;
-  let offerCount = 0;
   for (const product of products) {
     const card = makeElement("article", "offer-card");
     const heading = makeElement("div", "offer-product-head");
@@ -86,7 +93,7 @@ function renderOffers(products = [], query = "") {
     card.append(heading);
     const list = makeElement("div", "offer-rows");
     for (const offer of product.offers || []) {
-      offerCount += 1;
+      visibleOfferCount += 1;
       const row = makeElement("div", "offer-row");
       const info = makeElement("div", "offer-info");
       info.append(makeElement("strong", "", offer.marketplace), makeElement("span", "", offer.title));
@@ -109,22 +116,53 @@ function renderOffers(products = [], query = "") {
       row.append(actions); list.append(row);
     }
     card.append(list); offersList.append(card);
+    visibleProductCount += 1;
   }
-  offersCaption.textContent = `${offerCount} предложений`;
+  offersCaption.textContent = `${visibleProductCount} товаров · ${visibleOfferCount} предложений`;
+  count.textContent = `${visibleProductCount} товаров`;
 }
+
+async function loadMoreProducts() {
+  if (!activeQuery || loadMoreButton.disabled) return;
+  loadMoreButton.disabled = true;
+  loadMoreButton.textContent = "Загружаем…";
+  try {
+    const params = new URLSearchParams({ q: activeQuery, limit: "20", offset: String(nextOffset) });
+    const response = await fetch(`/api/search?${params}`, { headers: { "Accept": "application/json" } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Не удалось загрузить следующие товары.");
+    renderOffers(data.products || [], activeQuery, true);
+    nextOffset = data.offset + (data.products || []).length;
+    loadMoreButton.hidden = !data.has_more || !(data.products || []).length;
+    showMessage(notice, data.notice);
+  } catch (error) {
+    showMessage(notice, error.message || "Не удалось загрузить следующие товары.");
+  } finally {
+    loadMoreButton.disabled = false;
+    loadMoreButton.textContent = "Показать ещё 20 товаров";
+  }
+}
+
 async function runSearch(query) {
   const cleanQuery = query.trim();
   if (!cleanQuery) { input.focus(); return; }
+  activeQuery = cleanQuery;
+  nextOffset = 0;
   input.value = cleanQuery; setLoading(true);
+  loadMoreButton.hidden = true;
   title.textContent = `Ищем «${cleanQuery}»`;
   emptyState.hidden = true; offersWrap.hidden = true; showMessage(notice, "");
   providerGrid.replaceChildren(makeElement("div", "loading-card", "Ищем товары на Ozon, Wildberries и Яндекс Маркете…"));
   try {
-    const response = await fetch(`/api/search?${new URLSearchParams({ q: cleanQuery, limit: "20" })}`, { headers: { "Accept": "application/json" } });
+    const params = new URLSearchParams({ q: cleanQuery, limit: "20", offset: "0" });
+    const response = await fetch(`/api/search?${params}`, { headers: { "Accept": "application/json" } });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Не удалось выполнить поиск.");
     title.textContent = `Результаты для «${data.query}»`;
-    renderProviders(data.providers || []); renderOffers(data.products || [], cleanQuery);
+    renderProviders(data.providers || []);
+    renderOffers(data.products || [], cleanQuery);
+    nextOffset = data.offset + (data.products || []).length;
+    loadMoreButton.hidden = !data.has_more || !(data.products || []).length;
     emptyState.hidden = Boolean((data.products || []).length);
     if (!(data.products || []).length) {
       emptyState.querySelector("strong").textContent = "Товары пока не найдены";
@@ -135,6 +173,7 @@ async function runSearch(query) {
     title.textContent = "Не удалось выполнить поиск"; providerGrid.replaceChildren();
     emptyState.hidden = false; emptyState.querySelector("strong").textContent = "Поиск временно недоступен";
     emptyState.querySelector("span").textContent = error.message || "Сервер пока не отвечает.";
+    loadMoreButton.hidden = true;
     showMessage(notice, "Попробуй повторить поиск позже.");
   } finally { setLoading(false); }
 }
@@ -183,4 +222,5 @@ async function loadMonitors() {
 form.addEventListener("submit", event => { event.preventDefault(); runSearch(input.value); });
 document.querySelectorAll(".example-query").forEach(button => button.addEventListener("click", () => runSearch(button.textContent)));
 document.querySelector("#refresh-monitors").addEventListener("click", loadMonitors);
+loadMoreButton.addEventListener("click", loadMoreProducts);
 loadMonitors();
