@@ -59,6 +59,7 @@ class ProviderResult:
     search_url: str
     offers: list[Offer] = field(default_factory=list)
     message: str | None = None
+    has_more: bool | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -67,6 +68,7 @@ class ProviderResult:
             "search_url": self.search_url,
             "offers": [asdict(offer) for offer in self.offers],
             "message": self.message,
+            "has_more": self.has_more,
         }
 
 

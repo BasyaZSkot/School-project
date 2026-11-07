@@ -98,7 +98,6 @@ class MarketplaceSearchService:
         )
         provider_results = []
         provider_may_have_more = False
-        successful_provider_responses = 0
         offers: list[Offer] = []
         seen: set[tuple[str, str]] = set()
         for adapter, result in zip(self.adapters, results):
@@ -144,9 +143,6 @@ class MarketplaceSearchService:
                 continue
             provider_results.append(result.to_dict())
             status = result.status.value if hasattr(result.status, "value") else str(result.status)
-            if status in {"ready", "no_results"}:
-                successful_provider_responses += 1
-
             if session_id:
                 current = offers_by_marketplace.setdefault(adapter.marketplace, [])
                 if result.offers:
@@ -154,14 +150,22 @@ class MarketplaceSearchService:
                         current, result.offers
                     )
                     if status == "ready":
-                        more_by_marketplace[adapter.marketplace] = len(result.offers) >= provider_limit
+                        more_by_marketplace[adapter.marketplace] = (
+                            result.has_more if result.has_more is not None
+                            else len(result.offers) >= provider_limit
+                        )
+                    elif result.has_more is not None:
+                        more_by_marketplace[adapter.marketplace] = result.has_more
                 elif status in {"ready", "no_results"}:
-                    # A clean empty response confirms this source is exhausted;
-                    # failed/restricted responses keep the last known state.
-                    more_by_marketplace[adapter.marketplace] = False
+                    # Explicit pagination metadata takes precedence over an empty page.
+                    more_by_marketplace[adapter.marketplace] = (
+                        result.has_more if result.has_more is not None else False
+                    )
             else:
                 # A provider that filled its whole quota probably has more cards.
-                if len(result.offers) >= provider_limit:
+                if result.has_more is not None:
+                    provider_may_have_more = provider_may_have_more or result.has_more
+                elif len(result.offers) >= provider_limit:
                     provider_may_have_more = True
                 for offer in result.offers:
                     identity = (offer.marketplace, offer.external_id or offer.url)
@@ -248,7 +252,6 @@ class MarketplaceSearchService:
             and not page_products
             and provider_may_have_more
             and provider_limit < PROVIDER_FETCH_CAP
-            and successful_provider_responses < len(self.adapters)
         )
         has_more = total_products > offset + limit or (
             provider_may_have_more and provider_limit < PROVIDER_FETCH_CAP

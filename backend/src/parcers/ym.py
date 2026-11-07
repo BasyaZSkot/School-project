@@ -8,6 +8,9 @@ from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter, _price_from_offer
 
 
+MAX_SEARCH_PAGES = 50
+
+
 class _YandexProductStateParser(HTMLParser):
     # Read public data-auto fields used by Grex's Yandex product parser.
     _targets = {
@@ -259,7 +262,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
         offers = list(result.offers)
         seen = {offer.external_id or offer.url for offer in offers}
         base = urlparse(search_url)
-        for page in range(2, 6):
+        for page in range(2, MAX_SEARCH_PAGES + 1):
             query_items = [
                 (key, value) for key, value in parse_qsl(base.query, keep_blank_values=True)
                 if key != "page"
@@ -270,9 +273,11 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
                 final_url, html = await self._fetch_public_page(page_url)
             except Exception:
                 result.message = "Дополнительные страницы недоступны; показаны уже найденные товары."
+                result.has_more = True
                 break
             if self._is_challenge_page(final_url, html):
                 result.message = "Для дополнительных страниц Яндекс Маркет запросил проверку; показаны найденные товары."
+                result.has_more = True
                 break
 
             remaining = limit - len(offers)
@@ -282,6 +287,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
                 if (offer.external_id or offer.url) not in seen
             ]
             if not added:
+                result.has_more = False
                 break
             for offer in added:
                 identity = offer.external_id or offer.url
@@ -291,6 +297,13 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
                     break
             if len(offers) >= limit:
                 break
+        else:
+            if len(offers) < limit:
+                result.has_more = False
+                result.message = (
+                    f"Достигнут предел в {MAX_SEARCH_PAGES} публичных страниц; "
+                    "показаны найденные товары."
+                )
 
         result.offers = offers[:limit]
         if len(result.offers) < limit and result.message is None:

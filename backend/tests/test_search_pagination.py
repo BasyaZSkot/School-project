@@ -209,6 +209,43 @@ class SearchSessionKeepsResultsOnProviderFailureTests(unittest.TestCase):
         self.assertFalse(recovered["retryable"])
 
 
+class PartialProviderKeepsPaginationAvailableTests(unittest.IsolatedAsyncioTestCase):
+    async def test_explicit_has_more_survives_a_short_page_and_empty_retry(self):
+        class PartialAdapter:
+            marketplace = "Яндекс Маркет"
+
+            async def search(self, query: str, limit: int = 20) -> ProviderResult:
+                offers = [
+                    Offer(
+                        marketplace=self.marketplace,
+                        title=f"item {index:02d}",
+                        price=100 + index,
+                        currency="RUB",
+                        url=f"https://market.example/items/{index}",
+                        external_id=f"item-{index}",
+                    )
+                    for index in range(8)
+                ]
+                return ProviderResult(
+                    marketplace=self.marketplace,
+                    status=SearchStatus.READY,
+                    search_url="https://market.example/search",
+                    offers=offers,
+                    has_more=True,
+                )
+
+        service = MarketplaceSearchService(adapters=[PartialAdapter()])
+        session_id = "partial-provider-session"
+        first = await service.search("item", limit=20, offset=0, session_id=session_id)
+        retry = await service.search("item", limit=20, offset=8, session_id=session_id)
+
+        self.assertEqual(len(first["products"]), 8)
+        self.assertTrue(first["has_more"])
+        self.assertEqual(retry["products"], [])
+        self.assertTrue(retry["retryable"])
+        self.assertTrue(retry["has_more"])
+
+
 class StillHasMoreFarBeyondOldCapTests(unittest.TestCase):
     """Regression test: the "show more" button used to disappear after just
     one or two clicks, as soon as provider_limit reached the old 50-item cap
