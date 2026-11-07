@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 
 import httpx
 
 from .base import Offer, SearchAdapter, normalize_title, offer_group_key
 from .ozon import OzonAdapter
+from .transport import BlockedError
 from .wb import WildberriesAdapter
 from .ym import YandexMarketAdapter
 
 
 class MarketplaceSearchService:
-    def __init__(self, adapters: list[SearchAdapter] | None = None, provider_timeout: float = 12.0):
+    def __init__(self, adapters: list[SearchAdapter] | None = None, provider_timeout: float = 25.0):
         self.adapters = adapters if adapters is not None else [
             OzonAdapter.from_env(),
             WildberriesAdapter.from_env(),
@@ -49,6 +51,7 @@ class MarketplaceSearchService:
             return_exceptions=True,
         )
         provider_results = []
+        provider_may_have_more = False
         offers: list[Offer] = []
         seen: set[tuple[str, str]] = set()
         for adapter, result in zip(self.adapters, results):
@@ -67,9 +70,19 @@ class MarketplaceSearchService:
                     code = result.response.status_code
                     if code in (401, 403, 429, 498):
                         status = "policy_restricted"
-                        message = f"HTTP {code}: площадка ограничила автоматический запрос; откройте поиск на сайте."
+                        message = f"HTTP {code}: площадка ограничила автоматический запрос даже после повторных попыток; откройте поиск на сайте."
                     else:
                         message = f"HTTP {code}: площадка временно не ответила."
+                elif isinstance(result, httpx.TimeoutException):
+                    message = (
+                        "timeout: площадка не отвечает на запросы с этого IP-адреса. "
+                        "Ozon и Wildberries часто молча отбрасывают соединения из-за "
+                        "пределов РФ; задайте прокси в MULTIMARKET_PROXY_URLS "
+                        "или откройте поиск на сайте."
+                    )
+                elif isinstance(result, BlockedError):
+                    status = "policy_restricted"
+                    message = "Площадка показала страницу проверки (антибот/капча) вместо результатов; откройте поиск на сайте."
                 elif isinstance(result, httpx.RequestError):
                     message = "Сетевая ошибка при обращении к площадке."
                 else:
@@ -83,34 +96,21 @@ class MarketplaceSearchService:
                 })
                 continue
             provider_results.append(result.to_dict())
+            # A provider that filled its whole quota probably has more cards.
+            if len(result.offers) >= provider_limit:
+                provider_may_have_more = True
             for offer in result.offers:
-                identity = (offer.marketplace, offer.url)
+                identity = (offer.marketplace, offer.external_id or offer.url)
                 if identity not in seen:
                     seen.add(identity)
                     offers.append(offer)
 
-        # A comparison group may contain at most one offer from each marketplace.
-        # Keep same-marketplace listings separate so they are not mistaken for
-        # cross-market price comparisons.
-        grouped: list[tuple[str, list[Offer]]] = []
+        grouped: dict[str, list[Offer]] = defaultdict(list)
         for offer in offers:
-            key = offer_group_key(offer)
-            matching = next(
-                (
-                    product_offers
-                    for group_key, product_offers in grouped
-                    if group_key == key
-                    and all(item.marketplace != offer.marketplace for item in product_offers)
-                ),
-                None,
-            )
-            if matching is None:
-                grouped.append((key, [offer]))
-            else:
-                matching.append(offer)
+            grouped[offer_group_key(offer)].append(offer)
 
         products = []
-        for key, product_offers in grouped:
+        for key, product_offers in grouped.items():
             product_offers.sort(key=lambda item: (item.currency, item.price))
             lowest_by_currency = {}
             for offer in product_offers:
@@ -133,7 +133,12 @@ class MarketplaceSearchService:
         products.sort(key=lambda item: normalize_title(item["title"]))
         total_products = len(products)
         page_products = products[offset:offset + limit]
-        has_more = total_products > offset + limit
+        # Grouping merges offers, so the product count alone can drop below a
+        # full page even though providers still have more cards to give.
+        # provider_limit == 50 is the most we ever request, so nothing is left then.
+        has_more = total_products > offset + limit or (
+            provider_may_have_more and provider_limit < 50
+        )
         return {
             "query": query,
             "providers": provider_results,

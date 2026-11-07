@@ -15,7 +15,7 @@
 
 ## Live data status
 
-When no partner feed is configured, each default adapter reads only product data embedded in public HTTPS search pages. The Yandex adapter can request additional public result pages when the current page has fewer cards than requested. Price monitors revisit the selected public product page and use embedded state, Schema.org data, or the marketplace's public HTML fields when available. The service does not log in, reuse browser cookies, call undocumented private APIs, solve CAPTCHA, or evade access controls. Public pages can omit product data or restrict automated requests, so live results are not guaranteed. A configured licensed/partner JSON feed takes precedence for its marketplace.
+When no partner feed is configured, each default adapter reads only product data embedded in public HTTPS search pages. The Yandex adapter can request additional public result pages when the current page has fewer cards than requested. Price monitors revisit the selected public product page and use embedded state, Schema.org data, or the marketplace's public HTML fields when available. The service does not log in, call undocumented private APIs, or solve CAPTCHA. To reduce blocks it fetches pages through `transport.py` (see "Block resilience" below). Public pages can omit product data or restrict automated requests, so live results are not guaranteed. A configured licensed/partner JSON feed takes precedence for its marketplace.
 
 A live feed must return this shape:
 
@@ -75,4 +75,32 @@ GitHub Actions runs the same test command on pushes to `main` and `feat/**`, and
 
 The example parser's data model and field names informed the WB mapper. The browser/session and internal-endpoint transport are not invoked by the MultiMarket service. If a permitted source becomes available, inject an async source callable into `WildberriesAdapter.from_record_source(source)` that returns records compatible with the example `Item` model.
 
-Keep source rate limits, caching, attribution, currency and stock freshness explicit. Do not implement CAPTCHA solving, proxy rotation, browser fingerprint spoofing, or other access-control circumvention.
+Keep source rate limits, caching, attribution, currency and stock freshness explicit. CAPTCHA solving and calls to private endpoints are intentionally not implemented; see "Block resilience" for what is.
+
+## Block resilience
+
+All public-page requests go through `ResilientFetcher` (`transport.py`):
+
+- browser-like header profile (current Chrome on Windows/macOS), consistent per host and switched after a block;
+- per-host rate limiting with jitter (`MULTIMARKET_MIN_REQUEST_INTERVAL`, default 1 s) and a 60 s response cache (`MULTIMARKET_CACHE_TTL`);
+- up to `MULTIMARKET_FETCH_ATTEMPTS` (default 3) attempts with exponential backoff; `Retry-After` is honoured and capped at 30 s; all attempts together must fit into `MULTIMARKET_FETCH_TOTAL_TIMEOUT` (default 20 s), and the last real error (HTTP status or timeout) is reported;
+- a connection timeout is retried only when there is another proxy to switch to; with a single IP the request fails fast, because the same address would time out again;
+- session cookies issued by the site are reused and dropped after a block;
+- optional operator-supplied proxies: `MULTIMARKET_PROXY_URLS=http://user:pass@host:port,...` are used round-robin, and a proxy that fails rests for `MULTIMARKET_PROXY_COOLDOWN` seconds (default 300). If every proxy is resting, the least-recently failed one is used; the app never silently falls back to a direct connection;
+- challenge/CAPTCHA pages that come back with HTTP 200 are detected (small response containing known markers) and treated as blocks.
+
+- optional browser TLS fingerprint: with `MULTIMARKET_IMPERSONATE=chrome` (and `pip install -r backend/requirements-impersonate.txt`) requests are sent through `curl_cffi`, which performs the TLS/HTTP2 handshake of a real Chrome. Many sites decide on that handshake before looking at any header, so plain `httpx` gets 403/498 even with perfect headers. It does not execute JavaScript, so it cannot pass a site's JS challenge.
+
+Failures are logged as warnings by the `multimarket.transport` logger (host, route, status, time; proxy credentials are never logged).
+
+### Diagnosing "timeout" / "HTTP 403"
+
+```bash
+python backend/scripts/diagnose_fetch.py "наушники"
+```
+
+The script sends one plain request per marketplace (and per proxy from `MULTIMARKET_PROXY_URLS`) and says whether the site did not answer at all (typically a region/IP block), answered with an anti-bot status or challenge page, or returned a normal page without product markup.
+
+When attempts are exhausted the provider is reported as `policy_restricted` with a link to the site's own search. Set `MULTIMARKET_USER_AGENT` to override the User-Agent (client-hint headers are then dropped so they do not contradict it). Update `CHROME_MAJOR` in `transport.py` from time to time: an outdated browser version is itself a bot signal.
+
+Using proxies or automated access may violate a marketplace's terms of service. You are responsible for using this against sources you are allowed to access; prefer official APIs or licensed feeds for anything beyond a demo.

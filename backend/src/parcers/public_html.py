@@ -1,7 +1,9 @@
 """Best-effort parser for publicly rendered marketplace search pages.
 
 Only extracts product data explicitly present in a normal public HTML response.
-It does not log in, call private APIs, solve challenges, or evade access controls.
+Requests go through ``transport.ResilientFetcher`` (browser-like headers, rate
+limiting, retries with backoff, optional operator-supplied proxies). It does not
+log in, call private APIs, or solve CAPTCHAs.
 """
 from __future__ import annotations
 
@@ -10,9 +12,8 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import quote_plus, urljoin, urlparse
 
-import httpx
-
 from .base import Offer, ProviderResult, SearchStatus
+from .transport import ResilientFetcher, get_shared_fetcher
 
 
 class _JsonLdParser(HTMLParser):
@@ -129,11 +130,20 @@ class _MicrodataProductParser(HTMLParser):
 
 
 class PublicHtmlSearchAdapter:
-    def __init__(self, *, marketplace: str, search_url: str, allowed_hosts: tuple[str, ...], timeout: float = 10.0):
+    def __init__(
+        self,
+        *,
+        marketplace: str,
+        search_url: str,
+        allowed_hosts: tuple[str, ...],
+        timeout: float = 10.0,
+        fetcher: ResilientFetcher | None = None,
+    ):
         self.marketplace = marketplace
         self.search_url = search_url
         self.allowed_hosts = allowed_hosts
         self.timeout = timeout
+        self._fetcher = fetcher
 
     def _valid_marketplace_url(self, value: str, base: str) -> str | None:
         absolute = urljoin(base, value)
@@ -240,24 +250,11 @@ class PublicHtmlSearchAdapter:
         return None
 
     async def _fetch_public_page(self, url: str) -> tuple[str, str]:
-        headers = {
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.7",
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            ),
-        }
-        async with httpx.AsyncClient(
-            timeout=self.timeout, follow_redirects=True, headers=headers
-        ) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            final_url = str(response.url)
-            if not self._valid_marketplace_url(final_url, url):
-                raise ValueError("Marketplace redirected outside its own domain")
-            return final_url, response.text
+        fetcher = self._fetcher or get_shared_fetcher()
+        page = await fetcher.fetch(url)
+        if not self._valid_marketplace_url(page.url, url):
+            raise ValueError("Marketplace redirected outside its own domain")
+        return page.url, page.text
 
     async def parse_product(self, product_url: str) -> Offer | None:
         valid_url = self._valid_marketplace_url(product_url, product_url)

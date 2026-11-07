@@ -54,18 +54,20 @@ function renderProviders(providers) {
     top.append(element("span", "status " + info.className, info.label));
     card.append(top, element("h3", "", provider.marketplace));
     if (provider.message) card.append(element("p", "provider-message", provider.message));
+    const links = element("div", "provider-links");
     if (provider.search_url) {
       const link = element("a", "provider-link", "Открыть поиск ↗");
       link.href = provider.search_url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      card.append(link);
+      links.append(link);
     }
     if (provider.status === "policy_restricted" || provider.status === "access_required") {
       const setup = element("a", "provider-setup", "Как подключить источник");
       setup.href = "/sources";
-      card.append(setup);
+      links.append(setup);
     }
+    if (links.childElementCount) card.append(links);
     providerGrid.append(card);
   }
 }

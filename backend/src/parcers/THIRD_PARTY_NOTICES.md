@@ -32,10 +32,10 @@ SOFTWARE.
 
 Source: https://github.com/prog-time/grex
 
-The project requester confirmed written permission to use this repository. Ozon widgetStates parsing and Yandex Market data-auto selectors (search tiles and product-page fields) are adapted from crawlers/ozon.py and crawlers/yandex_market.py. The integration reads ordinary public HTML only; browser cookie capture, private API interception, proxy rotation, and CAPTCHA retry mechanisms are not included.
+The project requester confirmed written permission to use this repository. Product-page parsing in embedded_state.py and ym.py adapts Grex's Ozon widgetStates field mapping and Yandex Market data-auto selectors from crawlers/ozon.py and crawlers/yandex_market.py. The integration reads ordinary public HTML only; browser cookie capture, private API interception, and CAPTCHA retry mechanisms are not included. Proxy support in transport.py is an independent implementation and uses no code from this repository.
 
 ## Duff89/wb_parse_search_phrase
 
 Source: https://github.com/Duff89/wb_parse_search_phrase
 
-The project requester confirmed written permission to use this repository. Its Item field names and nested size price representation are adapted in the WB record mapper. MultiMarket's `wb_record_to_offer` adapts Item.fill_price_from_sizes behavior for nested size prices, kopeck conversion, stock, and image fields. The standalone fetcher, internal endpoint, cookie handling, and proxy settings are not used by the live search adapter.
+The project requester confirmed written permission to use this repository. Its Item field names and nested size price representation are adapted in the WB record mapper. MultiMarket's `wb_record_to_offer` adapts Item.fill_price_from_sizes behavior for nested size prices, kopeck conversion, stock, and image fields. The standalone fetcher, internal endpoint, and cookie handling are not used by the live search adapter. Proxy support in transport.py is an independent implementation and uses no code from this repository.
