@@ -11,6 +11,14 @@ from .transport import BlockedError
 from .wb import WildberriesAdapter
 from .ym import YandexMarketAdapter
 
+# How many raw offers we are willing to request from one provider for one
+# search call. Ozon/WB only ever fetch a single public page regardless of
+# this number, so raising it does not add extra requests for them. Yandex
+# Market's adapter crawls a handful of its own pages to try to fill the
+# request, bounded by its own page loop, so this cap is a safety ceiling on
+# top of that, not a multiplier on network calls.
+PROVIDER_FETCH_CAP = 200
+
 
 class MarketplaceSearchService:
     def __init__(self, adapters: list[SearchAdapter] | None = None, provider_timeout: float = 25.0):
@@ -40,12 +48,13 @@ class MarketplaceSearchService:
             raise ValueError("Search query must not be empty")
         if not 1 <= limit <= 50:
             raise ValueError("limit must be between 1 and 50")
-        if not 0 <= offset <= 150:
-            raise ValueError("offset must be between 0 and 150")
+        max_offset = PROVIDER_FETCH_CAP * 3
+        if not 0 <= offset <= max_offset:
+            raise ValueError(f"offset must be between 0 and {max_offset}")
 
         # Fetch enough records from each provider to assemble the requested
         # global page after cross-marketplace grouping and deduplication.
-        provider_limit = min(50, offset + limit + 1)
+        provider_limit = min(PROVIDER_FETCH_CAP, offset + limit + 1)
         results = await asyncio.gather(
             *(self._search_one(adapter, query, provider_limit) for adapter in self.adapters),
             return_exceptions=True,
@@ -135,9 +144,10 @@ class MarketplaceSearchService:
         page_products = products[offset:offset + limit]
         # Grouping merges offers, so the product count alone can drop below a
         # full page even though providers still have more cards to give.
-        # provider_limit == 50 is the most we ever request, so nothing is left then.
+        # provider_limit == PROVIDER_FETCH_CAP is the most we ever request, so
+        # nothing is left to ask for then.
         has_more = total_products > offset + limit or (
-            provider_may_have_more and provider_limit < 50
+            provider_may_have_more and provider_limit < PROVIDER_FETCH_CAP
         )
         return {
             "query": query,

@@ -2,7 +2,7 @@ import asyncio
 import unittest
 
 from src.parcers.base import Offer, ProviderResult, SearchStatus
-from src.parcers.service import MarketplaceSearchService
+from src.parcers.service import PROVIDER_FETCH_CAP, MarketplaceSearchService
 
 
 class FakeAdapter:
@@ -55,8 +55,10 @@ class SearchPaginationTests(unittest.TestCase):
 
     def test_rejects_offset_above_supported_range(self):
         service = MarketplaceSearchService(adapters=[])
+        max_offset = PROVIDER_FETCH_CAP * 3
+        asyncio.run(service.search("phone", limit=20, offset=max_offset))  # still allowed
         with self.assertRaises(ValueError):
-            asyncio.run(service.search("phone", limit=20, offset=151))
+            asyncio.run(service.search("phone", limit=20, offset=max_offset + 1))
 
 
 class MergingAdapter:
@@ -64,9 +66,13 @@ class MergingAdapter:
 
     marketplace = "Yandex Market"
 
+    # Effectively unlimited unless a test narrows it, to exercise pagination
+    # well beyond the old 50-item provider cap.
+    supply = 100_000
+
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         offers = []
-        for index in range(min(100, limit)):
+        for index in range(min(self.supply, limit)):
             title_index = index - 1 if index == 1 else index
             offers.append(
                 Offer(
@@ -100,15 +106,43 @@ class MergedProductsKeepPaginationTests(unittest.TestCase):
         self.assertEqual(len(second["products"]), 20)
         self.assertTrue(second["has_more"])
 
-    def test_no_more_after_the_hard_provider_cap(self):
-        service = MarketplaceSearchService(adapters=[MergingAdapter()])
-        last = asyncio.run(service.search("phone", limit=20, offset=40))
+    def test_no_more_once_the_fetch_cap_is_exhausted(self):
+        adapter = MergingAdapter()
+        adapter.supply = PROVIDER_FETCH_CAP  # exactly the ceiling, nothing beyond it
+        service = MarketplaceSearchService(adapters=[adapter])
+        last_offset = (PROVIDER_FETCH_CAP // 20 - 1) * 20
+        last = asyncio.run(service.search("phone", limit=20, offset=last_offset))
         self.assertFalse(last["has_more"])
 
     def test_no_more_when_provider_returned_less_than_requested(self):
         service = MarketplaceSearchService(adapters=[FakeAdapter("Ozon", "ozon", 5)])
         result = asyncio.run(service.search("phone", limit=20, offset=0))
         self.assertFalse(result["has_more"])
+
+
+class StillHasMoreFarBeyondOldCapTests(unittest.TestCase):
+    """Regression test: the "show more" button used to disappear after just
+    one or two clicks, as soon as provider_limit reached the old 50-item cap
+    -- even when a provider clearly had many more items to give. It must now
+    stay available for as many clicks as the provider can actually support,
+    up to the new, much larger PROVIDER_FETCH_CAP.
+    """
+
+    def test_load_more_survives_many_clicks(self):
+        service = MarketplaceSearchService(adapters=[MergingAdapter()])
+        offset = 0
+        clicks = 0
+        while True:
+            result = asyncio.run(service.search("phone", limit=20, offset=offset))
+            self.assertGreater(len(result["products"]), 0)
+            if not result["has_more"]:
+                break
+            offset += 20
+            clicks += 1
+            self.assertLess(clicks, 20, "has_more should have become False by now")
+        # The button should survive well past offset=40, where the old
+        # 50-item cap used to kill it after just two clicks.
+        self.assertGreaterEqual(offset, 160)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ let activeQuery = "";
 let nextOffset = 0;
 let productCount = 0;
 let offerCount = 0;
+const DEFAULT_PAGE_SIZE = 20;
 
 const providerMeta = {
   "Ozon": { logo: "O", className: "ozon-logo" },
@@ -37,6 +38,13 @@ function element(tag, className, text) {
 function message(node, text) {
   node.hidden = !text;
   node.querySelector("p").textContent = text || "";
+}
+function productsWord(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "товар";
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "товара";
+  return "товаров";
 }
 function money(value, currency) {
   return new Intl.NumberFormat("ru-RU", {
@@ -111,11 +119,20 @@ function renderOffers(products, query, append) {
       offerCount += 1;
       const row = element("div", "offer-row");
       const info = element("div", "offer-info");
-      info.append(element("strong", "", offer.marketplace), element("span", "", offer.title || product.title));
+      info.append(element("strong", "", offer.marketplace));
+      // Offers of the same product usually repeat the product's own title;
+      // showing it again under every row just clutters the card, so only
+      // add it when it actually differs (e.g. a seller-specific variant).
+      const offerTitle = (offer.title || "").trim();
+      const productTitle = (product.title || "").trim();
+      if (offerTitle && offerTitle !== productTitle) {
+        info.append(element("span", "", offerTitle));
+      }
       if (offers.length > 1 && Number(offer.price) === minima.get(offer.currency || "RUB")) {
         info.append(element("span", "best-price-badge", "Лучшая цена"));
       }
-      row.append(info, element("strong", "offer-price", money(offer.price, offer.currency)));
+      const right = element("div", "offer-right");
+      right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
       const actions = element("div", "offer-actions");
       const link = element("a", "offer-open", "К товару ↗");
       link.href = offer.url;
@@ -144,7 +161,8 @@ function renderOffers(products, query, append) {
         }
       });
       actions.append(watch);
-      row.append(actions);
+      right.append(actions);
+      row.append(info, right);
       rows.append(row);
     });
     card.append(rows);
@@ -174,6 +192,14 @@ async function fetchPage(offset, append) {
   }
   nextOffset = data.offset + (data.products || []).length;
   moreButton.hidden = !data.has_more || !(data.products || []).length;
+  // We only know exactly how many products are left once total_products is
+  // a firm count (i.e. not just "providers might have even more" headroom);
+  // otherwise DEFAULT_PAGE_SIZE is the best guess until the next page proves
+  // otherwise.
+  const known = Math.max(0, (data.total_products ?? 0) - nextOffset);
+  const nextBatch = known > 0 ? Math.min(DEFAULT_PAGE_SIZE, known) : DEFAULT_PAGE_SIZE;
+  moreButton.dataset.nextBatch = String(nextBatch);
+  moreButton.textContent = `Показать ещё ${nextBatch} ${productsWord(nextBatch)}`;
 }
 async function runSearch(query) {
   activeQuery = query.trim();
