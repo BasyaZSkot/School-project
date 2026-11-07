@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import monitoring
-from .service import MarketplaceSearchService
+from .service import MarketplaceSearchService, PROVIDER_FETCH_CAP
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 STATIC_DIR = BACKEND_DIR / "static"
@@ -97,9 +97,12 @@ async def health():
 async def search(
     q: str = Query(min_length=1, max_length=160, description="Название товара"),
     limit: int = Query(default=20, ge=1, le=50),
-    offset: int = Query(default=0, ge=0, le=150),
+    offset: int = Query(default=0, ge=0, le=PROVIDER_FETCH_CAP * 3),
+    session_id: str | None = Query(default=None, min_length=8, max_length=80),
 ):
     try:
+        if session_id:
+            return await search_service.search(q, limit, offset, session_id=session_id)
         return await search_service.search(q, limit, offset)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

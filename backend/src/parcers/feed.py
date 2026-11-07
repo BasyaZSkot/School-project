@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from .base import DisabledAdapter, Offer, ProviderResult, SearchStatus
+from .base import MAX_PROVIDER_LIMIT, DisabledAdapter, Offer, ProviderResult, SearchStatus
 
 
 class JsonFeedAdapter(DisabledAdapter):
@@ -119,8 +119,8 @@ class JsonFeedAdapter(DisabledAdapter):
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         if not query.strip():
             raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+        if not 1 <= limit <= MAX_PROVIDER_LIMIT:
+            raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
 
         headers = {"Accept": "application/json"}
         if self.token:

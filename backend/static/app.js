@@ -11,6 +11,7 @@ const offersList = document.querySelector("#offers-list");
 const offersCaption = document.querySelector("#offers-caption");
 const moreButton = document.querySelector("#load-more-button");
 let activeQuery = "";
+let activeSearchId = "";
 let nextOffset = 0;
 let productCount = 0;
 let offerCount = 0;
@@ -49,6 +50,12 @@ function productsWord(n) {
   if (mod10 === 1 && mod100 !== 11) return "товар";
   if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "товара";
   return "товаров";
+}
+function newSearchSessionId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return "search-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 function money(value, currency) {
   return new Intl.NumberFormat("ru-RU", {
@@ -265,7 +272,9 @@ document.querySelector("#detail-close").addEventListener("click", () => productD
 
 async function fetchPage(offset, append, sequence = searchSequence) {
   const query = activeQuery;
-  const params = new URLSearchParams({ q: query, limit: "20", offset: String(offset) });
+  const params = new URLSearchParams({
+    q: query, limit: "20", offset: String(offset), session_id: activeSearchId
+  });
   const response = await fetch("/api/search?" + params, { headers: { Accept: "application/json" } });
   const data = await response.json();
   if (sequence !== searchSequence) return;
@@ -283,19 +292,30 @@ async function fetchPage(offset, append, sequence = searchSequence) {
   } else {
     renderOffers(data.products || [], activeQuery, true);
   }
-  nextOffset = data.offset + (data.products || []).length;
-  moreButton.hidden = !data.has_more || !(data.products || []).length;
+  const pageProducts = data.products || [];
+  nextOffset = data.offset + pageProducts.length;
+  const retryableEmptyPage = append && data.retryable && !pageProducts.length;
+  moreButton.hidden = retryableEmptyPage ? false : !data.has_more || !pageProducts.length;
+  if (append) {
+    message(notice, data.retryable
+      ? "Источник временно не ответил. Найденные товары сохранены — нажмите кнопку ещё раз, чтобы повторить загрузку."
+      : "");
+  }
   // total_products only reflects every product that exists once every
   // provider has run dry (exact_total); otherwise the backend only probed
   // one item past the current page, so total_products is not a real count
   // and DEFAULT_PAGE_SIZE is the only honest guess for the next click.
   const remaining = data.exact_total ? Math.max(0, (data.total_products ?? 0) - nextOffset) : 0;
   const nextBatch = remaining > 0 ? Math.min(DEFAULT_PAGE_SIZE, remaining) : DEFAULT_PAGE_SIZE;
-  moreButton.textContent = `Показать ещё ${nextBatch} ${productsWord(nextBatch)}`;
+  moreButton.textContent = data.retryable
+    ? "Повторить загрузку"
+    : `Показать ещё ${nextBatch} ${productsWord(nextBatch)}`;
 }
 async function runSearch(query) {
   activeQuery = query.trim();
   if (!activeQuery) return;
+  activeSearchId = newSearchSessionId();
+  nextOffset = 0;
   const sequence = ++searchSequence;
   input.value = activeQuery;
   button.disabled = true;

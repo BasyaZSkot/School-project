@@ -157,6 +157,58 @@ class SameMarketplaceListingsPaginationTests(unittest.TestCase):
         self.assertEqual(len(set(sum(ids, []))), 80)
 
 
+class SearchSessionKeepsResultsOnProviderFailureTests(unittest.TestCase):
+    def test_cached_prefix_survives_temporary_failure_and_allows_retry(self):
+        class IntermittentAdapter:
+            marketplace = "Yandex Market"
+            fail = False
+
+            async def search(self, query: str, limit: int = 20) -> ProviderResult:
+                if self.fail:
+                    raise RuntimeError("temporary marketplace failure")
+                offers = [
+                    Offer(
+                        marketplace=self.marketplace,
+                        title=f"cached item {index:03d}",
+                        price=100 + index,
+                        currency="RUB",
+                        url=f"https://market.example/items/{index}",
+                        external_id=f"item-{index}",
+                    )
+                    for index in range(min(70, limit))
+                ]
+                return ProviderResult(
+                    marketplace=self.marketplace,
+                    status=SearchStatus.READY,
+                    search_url="https://market.example/search",
+                    offers=offers,
+                )
+
+        adapter = IntermittentAdapter()
+        service = MarketplaceSearchService(adapters=[adapter])
+        session_id = "session-test-123"
+        first = asyncio.run(service.search("item", limit=20, offset=0, session_id=session_id))
+        second = asyncio.run(service.search("item", limit=20, offset=20, session_id=session_id))
+        self.assertEqual(len(first["products"]), 20)
+        self.assertEqual(len(second["products"]), 20)
+
+        adapter.fail = True
+        third = asyncio.run(service.search("item", limit=20, offset=40, session_id=session_id))
+        self.assertEqual(len(third["products"]), 1)
+        self.assertEqual(third["products"][0]["offers"][0]["external_id"], "item-40")
+        self.assertTrue(third["has_more"])
+
+        retry = asyncio.run(service.search("item", limit=20, offset=41, session_id=session_id))
+        self.assertEqual(retry["products"], [])
+        self.assertTrue(retry["retryable"])
+        self.assertTrue(retry["has_more"])
+
+        adapter.fail = False
+        recovered = asyncio.run(service.search("item", limit=20, offset=41, session_id=session_id))
+        self.assertEqual(len(recovered["products"]), 20)
+        self.assertFalse(recovered["retryable"])
+
+
 class StillHasMoreFarBeyondOldCapTests(unittest.TestCase):
     """Regression test: the "show more" button used to disappear after just
     one or two clicks, as soon as provider_limit reached the old 50-item cap
@@ -183,6 +235,47 @@ class StillHasMoreFarBeyondOldCapTests(unittest.TestCase):
         # 50-item cap used to kill it after just two clicks.
         self.assertGreaterEqual(offset, 160)
 
+
+class PublicHtmlProviderPaginationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_html_adapter_keeps_pages_working_after_offset_50(self):
+        import json
+
+        from src.parcers.public_html import PublicHtmlSearchAdapter
+        from src.parcers.transport import FetchedPage
+
+        records = [{
+            "@type": "Product",
+            "name": f"Test item {index:03d}",
+            "sku": str(index),
+            "url": f"https://www.ozon.ru/product/item-{index}/",
+            "offers": {"price": str(100 + index), "priceCurrency": "RUB"},
+        } for index in range(70)]
+        html = '<script type="application/ld+json">' + json.dumps({"@graph": records}) + '</script>'
+
+        class StaticFetcher:
+            async def fetch(self, url):
+                return FetchedPage(url=url, text=html, status_code=200)
+
+        adapter = PublicHtmlSearchAdapter(
+            marketplace="Ozon",
+            search_url="https://www.ozon.ru/search/?text={query}",
+            allowed_hosts=("ozon.ru",),
+            fetcher=StaticFetcher(),
+        )
+        service = MarketplaceSearchService(adapters=[adapter])
+        session_id = "large-page-session"
+        pages = [
+            await service.search("item", limit=20, offset=offset, session_id=session_id)
+            for offset in (0, 20, 40, 60)
+        ]
+
+        self.assertEqual([len(page["products"]) for page in pages], [20, 20, 20, 10])
+        self.assertTrue(all(page["has_more"] for page in pages[:3]))
+        self.assertFalse(pages[3]["has_more"])
+        self.assertEqual(
+            [page["products"][0]["offers"][0]["external_id"] for page in pages],
+            ["0", "20", "40", "60"],
+        )
 
 if __name__ == "__main__":
     unittest.main()

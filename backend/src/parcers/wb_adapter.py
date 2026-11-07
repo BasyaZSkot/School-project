@@ -9,7 +9,7 @@ from collections.abc import Awaitable, Callable, Iterable
 import json
 from typing import Any
 
-from .base import DisabledAdapter, Offer, ProviderResult, SearchStatus
+from .base import MAX_PROVIDER_LIMIT, DisabledAdapter, Offer, ProviderResult, SearchStatus
 
 RecordSource = Callable[[str, int], Awaitable[Iterable[Any]]]
 
@@ -173,8 +173,8 @@ class WildberriesAdapter(DisabledAdapter):
 
         if not query.strip():
             raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+        if not 1 <= limit <= MAX_PROVIDER_LIMIT:
+            raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
 
         records = await self.source(query, limit)
         offers = []

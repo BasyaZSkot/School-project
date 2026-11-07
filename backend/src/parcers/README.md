@@ -1,8 +1,12 @@
 # MultiMarket marketplace connectors
 
+## Project reference
+
+See [PROJECT_REFERENCE.md](../../PROJECT_REFERENCE.md) for the full Russian catalog of application classes, methods and functions.
+
 ## Parser guide
 
-See [PARSER_GUIDE.md](PARSER_GUIDE.md) for a Russian walkthrough of every parser module and the WB/Ozon parsing methods.
+See [PARSER_GUIDE.md](PARSER_GUIDE.md) for a Russian walkthrough of parser modules and the WB/Ozon parsing flow.
 
 ## What is implemented
 

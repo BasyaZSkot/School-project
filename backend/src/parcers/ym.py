@@ -3,7 +3,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, quote_plus, urlencode, urljoin, urlparse, urlunparse
 
-from .base import Offer, ProviderResult, SearchStatus
+from .base import MAX_PROVIDER_LIMIT, Offer, ProviderResult, SearchStatus
 from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter, _price_from_offer
 
@@ -230,8 +230,8 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
     async def search(self, query: str, limit: int = 20):
         if not query.strip():
             raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+        if not 1 <= limit <= MAX_PROVIDER_LIMIT:
+            raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
 
         clean_query = " ".join(query.split())
         search_url = self.search_url.format(query=quote_plus(clean_query))

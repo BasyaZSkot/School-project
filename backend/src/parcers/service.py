@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import defaultdict
 
 import httpx
 
-from .base import Offer, SearchAdapter, normalize_title, offer_group_key
+from .base import MAX_PROVIDER_LIMIT, Offer, SearchAdapter, normalize_title, offer_group_key
 from .ozon import OzonAdapter
 from .transport import BlockedError
 from .wb import WildberriesAdapter
@@ -17,7 +18,9 @@ from .ym import YandexMarketAdapter
 # Market's adapter crawls a handful of its own pages to try to fill the
 # request, bounded by its own page loop, so this cap is a safety ceiling on
 # top of that, not a multiplier on network calls.
-PROVIDER_FETCH_CAP = 200
+PROVIDER_FETCH_CAP = MAX_PROVIDER_LIMIT
+SEARCH_SESSION_TTL_SECONDS = 600
+MAX_SEARCH_SESSIONS = 100
 
 
 class MarketplaceSearchService:
@@ -28,6 +31,20 @@ class MarketplaceSearchService:
             YandexMarketAdapter.from_env(),
         ]
         self.provider_timeout = provider_timeout
+        self._search_sessions: dict[str, dict] = {}
+
+    @staticmethod
+    def _merge_provider_offers(existing: list[Offer], incoming: list[Offer]) -> list[Offer]:
+        merged = list(existing)
+        indexes = {offer.external_id or offer.url: index for index, offer in enumerate(merged)}
+        for offer in incoming:
+            identity = offer.external_id or offer.url
+            if identity in indexes:
+                merged[indexes[identity]] = offer
+            else:
+                indexes[identity] = len(merged)
+                merged.append(offer)
+        return merged
 
     async def parse_product(self, marketplace: str, product_url: str) -> Offer | None:
         adapter = next(
@@ -42,7 +59,10 @@ class MarketplaceSearchService:
     async def _search_one(self, adapter: SearchAdapter, query: str, limit: int):
         return await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
 
-    async def search(self, query: str, limit: int = 20, offset: int = 0) -> dict:
+    async def search(
+        self, query: str, limit: int = 20, offset: int = 0,
+        session_id: str | None = None,
+    ) -> dict:
         query = query.strip()
         if not query:
             raise ValueError("Search query must not be empty")
@@ -51,6 +71,23 @@ class MarketplaceSearchService:
         max_offset = PROVIDER_FETCH_CAP * 3
         if not 0 <= offset <= max_offset:
             raise ValueError(f"offset must be between 0 and {max_offset}")
+
+        # A UI search session keeps the successfully fetched provider prefixes.
+        # Some marketplaces can temporarily fail between page clicks; retaining
+        # the last good prefix prevents that failure from erasing the result set.
+        offers_by_marketplace: dict[str, list[Offer]] = {}
+        more_by_marketplace: dict[str, bool] = {}
+        now = time.monotonic()
+        for key, saved in list(self._search_sessions.items()):
+            if now - saved["updated_at"] > SEARCH_SESSION_TTL_SECONDS:
+                del self._search_sessions[key]
+        if session_id:
+            saved = self._search_sessions.get(session_id)
+            if saved and saved["query"] == query:
+                offers_by_marketplace = {
+                    name: list(items) for name, items in saved["offers"].items()
+                }
+                more_by_marketplace = dict(saved["has_more"])
 
         # Fetch enough records from each provider to assemble the requested
         # global page after cross-marketplace grouping and deduplication.
@@ -61,6 +98,7 @@ class MarketplaceSearchService:
         )
         provider_results = []
         provider_may_have_more = False
+        successful_provider_responses = 0
         offers: list[Offer] = []
         seen: set[tuple[str, str]] = set()
         for adapter, result in zip(self.adapters, results):
@@ -105,14 +143,52 @@ class MarketplaceSearchService:
                 })
                 continue
             provider_results.append(result.to_dict())
-            # A provider that filled its whole quota probably has more cards.
-            if len(result.offers) >= provider_limit:
-                provider_may_have_more = True
-            for offer in result.offers:
-                identity = (offer.marketplace, offer.external_id or offer.url)
-                if identity not in seen:
-                    seen.add(identity)
-                    offers.append(offer)
+            status = result.status.value if hasattr(result.status, "value") else str(result.status)
+            if status in {"ready", "no_results"}:
+                successful_provider_responses += 1
+
+            if session_id:
+                current = offers_by_marketplace.setdefault(adapter.marketplace, [])
+                if result.offers:
+                    offers_by_marketplace[adapter.marketplace] = self._merge_provider_offers(
+                        current, result.offers
+                    )
+                    if status == "ready":
+                        more_by_marketplace[adapter.marketplace] = len(result.offers) >= provider_limit
+                elif status in {"ready", "no_results"}:
+                    # A clean empty response confirms this source is exhausted;
+                    # failed/restricted responses keep the last known state.
+                    more_by_marketplace[adapter.marketplace] = False
+            else:
+                # A provider that filled its whole quota probably has more cards.
+                if len(result.offers) >= provider_limit:
+                    provider_may_have_more = True
+                for offer in result.offers:
+                    identity = (offer.marketplace, offer.external_id or offer.url)
+                    if identity not in seen:
+                        seen.add(identity)
+                        offers.append(offer)
+
+        if session_id:
+            offers = [
+                offer
+                for adapter in self.adapters
+                for offer in offers_by_marketplace.get(adapter.marketplace, [])
+            ]
+            provider_may_have_more = any(more_by_marketplace.values())
+            self._search_sessions[session_id] = {
+                "query": query,
+                "offers": offers_by_marketplace,
+                "has_more": more_by_marketplace,
+                "updated_at": time.monotonic(),
+            }
+            if len(self._search_sessions) > MAX_SEARCH_SESSIONS:
+                oldest = min(
+                    self._search_sessions,
+                    key=lambda key: self._search_sessions[key]["updated_at"],
+                )
+                if oldest != session_id:
+                    del self._search_sessions[oldest]
 
         # Match the same listing across different marketplaces, but never
         # collapse two distinct listings from one marketplace into one card.
@@ -166,9 +242,17 @@ class MarketplaceSearchService:
         # full page even though providers still have more cards to give.
         # provider_limit == PROVIDER_FETCH_CAP is the most we ever request, so
         # nothing is left to ask for then.
+        retryable = bool(
+            session_id
+            and offset > 0
+            and not page_products
+            and provider_may_have_more
+            and provider_limit < PROVIDER_FETCH_CAP
+            and successful_provider_responses < len(self.adapters)
+        )
         has_more = total_products > offset + limit or (
             provider_may_have_more and provider_limit < PROVIDER_FETCH_CAP
-        )
+        ) or retryable
         # True only once every provider has returned fewer offers than we
         # asked for, i.e. we did not just hit our own request size and stop
         # early. We always ask for one extra item beyond the current page
@@ -185,6 +269,7 @@ class MarketplaceSearchService:
             "total_products": total_products,
             "exact_total": exact_total,
             "has_more": has_more,
+            "retryable": retryable,
             "total_offers": len(offers),
             "notice": None if offers else "Поиск завершён, но площадки не вернули читаемые карточки товаров. Попробуйте изменить запрос.",
         }

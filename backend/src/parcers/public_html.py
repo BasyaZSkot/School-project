@@ -12,7 +12,7 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import quote_plus, urljoin, urlparse
 
-from .base import Offer, ProviderResult, SearchStatus
+from .base import MAX_PROVIDER_LIMIT, Offer, ProviderResult, SearchStatus
 from .transport import ResilientFetcher, get_shared_fetcher
 
 
@@ -371,8 +371,8 @@ class PublicHtmlSearchAdapter:
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         if not query.strip():
             raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+        if not 1 <= limit <= MAX_PROVIDER_LIMIT:
+            raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
         # Normalize whitespace without imposing a minimum query length.
         clean_query = " ".join(query.split())
         url = self.search_url.format(query=quote_plus(clean_query))

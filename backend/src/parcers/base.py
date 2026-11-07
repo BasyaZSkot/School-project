@@ -9,6 +9,9 @@ import re
 import unicodedata
 
 
+MAX_PROVIDER_LIMIT = 200
+
+
 class SearchStatus(str, Enum):
     READY = "ready"
     NO_RESULTS = "no_results"
@@ -88,8 +91,8 @@ class DisabledAdapter:
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         if not query.strip():
             raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+        if not 1 <= limit <= MAX_PROVIDER_LIMIT:
+            raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
         return ProviderResult(
             marketplace=self.marketplace,
             status=self.status,
