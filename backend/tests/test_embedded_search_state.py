@@ -4,6 +4,7 @@ import unittest
 from src.parcers.embedded_state import (
     embedded_json_documents,
     extract_ozon_embedded,
+    extract_ozon_product,
     extract_wildberries_embedded,
 )
 from src.parcers.wb import WildberriesAdapter
@@ -67,6 +68,32 @@ class EmbeddedMarketplaceSearchStateTests(unittest.TestCase):
         self.assertEqual(offers[0].url, "https://www.ozon.ru/product/headphones-777/")
         self.assertEqual(offers[0].external_id, "ozon-777")
         self.assertEqual(offers[0].image_url, "https://cdn1.ozon.ru/s3/headphones.jpg")
+
+    def test_reads_ozon_details_from_public_product_widgets(self):
+        state = {"widgetStates": {
+            "webProductHeading-1": json.dumps({"title": "Наушники Example"}),
+            "webPrice-1": json.dumps({"price": "4 590 ₽"}),
+            "webGallery-1": json.dumps({"sku": "777", "images": []}),
+            "webDescription-1": json.dumps({"description": "<p>Чистый звук.</p>"}),
+            "webCharacteristics-1": json.dumps({"characteristics": [{
+                "short": [{"name": "Цвет", "values": [{"text": "Чёрный"}]}],
+                "full": [],
+            }]}),
+            "webReviewProductScore-1": json.dumps({"ratingValue": "4.8", "reviewCount": 215}),
+            "webReviewList-1": json.dumps({"items": [{
+                "author": {"name": "Анна"}, "text": "Звук понравился.", "rating": "5",
+            }]}),
+        }}
+        html = '<script type="application/json">' + json.dumps(state, ensure_ascii=False) + '</script>'
+
+        offer = extract_ozon_product(html, "https://www.ozon.ru/product/headphones-777/")
+
+        self.assertIsNotNone(offer)
+        self.assertEqual(offer.description, "Чистый звук.")
+        self.assertEqual(offer.rating, 4.8)
+        self.assertEqual(offer.review_count, 215)
+        self.assertEqual(offer.specifications, [{"name": "Цвет", "value": "Чёрный"}])
+        self.assertEqual(offer.reviews[0]["body"], "Звук понравился.")
 
     def test_rejects_ozon_product_link_to_external_host(self):
         widget = {

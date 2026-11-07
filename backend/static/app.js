@@ -206,6 +206,23 @@ function renderDetailFields(data, fallbackOffer) {
     element("dt", "detail-muted", "Сведения"),
     element("dd", "detail-muted", "Характеристики не опубликованы.")
   );
+
+  const reviewList = document.querySelector("#detail-review-list");
+  reviewList.replaceChildren();
+  const reviewEntries = Array.isArray(details.reviews) ? details.reviews.slice(0, 10) : [];
+  for (const review of reviewEntries) {
+    if (!review || !review.body) continue;
+    const card = element("article", "detail-review");
+    const header = element("div", "detail-review-head");
+    header.append(element("strong", "", review.author || "Покупатель"));
+    const meta = [review.rating ? `★ ${review.rating}` : "", review.date || ""].filter(Boolean).join(" · ");
+    if (meta) header.append(element("span", "", meta));
+    card.append(header, element("p", "", review.body));
+    reviewList.append(card);
+  }
+  if (!reviewList.childElementCount) {
+    reviewList.append(element("p", "detail-muted", "Публичные тексты отзывов не найдены."));
+  }
 }
 
 async function openProductDetails(offer) {

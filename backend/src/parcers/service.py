@@ -156,6 +156,7 @@ class MarketplaceSearchService:
                         "rating": item.rating,
                         "review_count": item.review_count,
                         "specifications": item.specifications,
+                        "reviews": item.reviews,
                     } for item in product_offers],
                 })
         products.sort(key=lambda item: normalize_title(item["title"]))

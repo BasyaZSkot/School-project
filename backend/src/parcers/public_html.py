@@ -122,11 +122,38 @@ def _product_metadata(item: dict) -> dict:
             if len(specifications) >= 30:
                 break
 
+    raw_reviews = item.get("review") or item.get("reviews") or []
+    if isinstance(raw_reviews, dict):
+        raw_reviews = [raw_reviews]
+    reviews = []
+    if isinstance(raw_reviews, list):
+        for review in raw_reviews:
+            if not isinstance(review, dict):
+                continue
+            body = _clean_description(review.get("reviewBody") or review.get("description"))
+            if not body:
+                continue
+            author = _as_text(review.get("author"))
+            date = _as_text(review.get("datePublished"))
+            review_rating = review.get("reviewRating")
+            if isinstance(review_rating, list):
+                review_rating = next((value for value in review_rating if isinstance(value, dict)), {})
+            score = _number(review_rating.get("ratingValue")) if isinstance(review_rating, dict) else None
+            reviews.append({
+                "body": body[:1200],
+                "author": author[:120] if author else "Покупатель",
+                "date": date[:40] if date else "",
+                "rating": str(score) if score is not None and score <= 5 else "",
+            })
+            if len(reviews) >= 10:
+                break
+
     return {
         "description": _clean_description(item.get("description")),
         "rating": rating,
         "review_count": review_count,
         "specifications": specifications,
+        "reviews": reviews,
     }
 
 

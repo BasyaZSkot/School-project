@@ -326,6 +326,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             offer.rating = structured.rating
             offer.review_count = structured.review_count
             offer.specifications = structured.specifications
+            offer.reviews = structured.reviews
             offer.image_url = structured.image_url
         return offer
 

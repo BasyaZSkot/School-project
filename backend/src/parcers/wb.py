@@ -36,7 +36,8 @@ class WildberriesAdapter(PublicHtmlSearchAdapter):
             embedded.description = structured.description
             embedded.rating = structured.rating
             embedded.review_count = structured.review_count
-            embedded.specifications = structured.specifications
+            embedded.specifications = embedded.specifications or structured.specifications
+            embedded.reviews = embedded.reviews or structured.reviews
             embedded.image_url = embedded.image_url or structured.image_url
         return embedded
 

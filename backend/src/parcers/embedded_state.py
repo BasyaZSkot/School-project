@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import json
 import re
+from html import unescape
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlparse
 
 from .base import Offer
-from .public_html import _price_from_offer
+from .public_html import _clean_description, _number, _price_from_offer, _review_total
 from .wb_adapter import wb_record_to_offer
 
 
@@ -254,12 +255,99 @@ def _ozon_widget_price(value: Any) -> float | None:
     return _price_from_offer({"price": value})
 
 
+def _ozon_named_scalar(value: Any, keys: tuple[str, ...]) -> Any | None:
+    wanted = {key.lower() for key in keys}
+    for node in _nodes(value):
+        for key, candidate in node.items():
+            if str(key).lower() in wanted and isinstance(candidate, (str, int, float)):
+                if str(candidate).strip():
+                    return candidate
+    return None
+
+
+def _ozon_plain_text(value: Any) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("text") or value.get("description") or value.get("html") or value.get("value")
+    if not isinstance(value, str):
+        return None
+    return _clean_description(re.sub(r"<[^>]+>", " ", unescape(value)))
+
+
+def _ozon_characteristics(widget: dict) -> list[dict[str, str]]:
+    sections = widget.get("characteristics") or []
+    if isinstance(sections, dict):
+        sections = [sections]
+    if not isinstance(sections, list):
+        return []
+    result = []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        items = []
+        for key in ("short", "full"):
+            values = section.get(key) or []
+            if isinstance(values, dict):
+                values = [values]
+            if isinstance(values, list):
+                items.extend(values)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            values = item.get("values", [])
+            if isinstance(values, list):
+                value = ", ".join(
+                    str(entry.get("text", "")).strip()
+                    for entry in values if isinstance(entry, dict) and entry.get("text")
+                )
+            else:
+                value = str(values).strip()
+            if name and value:
+                result.append({"name": str(name).strip()[:120], "value": value[:500]})
+            if len(result) >= 30:
+                return result
+    return result
+
+
+def _ozon_review_entries(widget: dict) -> list[dict[str, str]]:
+    reviews = []
+    seen = set()
+    for node in _nodes(widget):
+        body = next(
+            (node.get(key) for key in ("reviewBody", "body", "content", "text")
+             if isinstance(node.get(key), str) and node.get(key).strip()),
+            None,
+        )
+        body = _ozon_plain_text(body)
+        if not body or body in seen:
+            continue
+        author = _first_text(node.get("author") or node.get("user") or {}, ("name", "title"))
+        raw_rating = _ozon_named_scalar(node, ("ratingValue", "reviewRating", "rating"))
+        rating = _number(raw_rating)
+        reviews.append({
+            "body": body[:1200],
+            "author": author[:120] if author else "Покупатель",
+            "date": str(node.get("datePublished") or node.get("date") or "")[:40],
+            "rating": str(rating) if rating is not None and rating <= 5 else "",
+        })
+        seen.add(body)
+        if len(reviews) >= 10:
+            break
+    return reviews
+
+
 def extract_ozon_product(html: str, page_url: str) -> Offer | None:
-    # Adapted from Grex's Ozon widget parsing.
+    # Adapted from Grex's public widget field mapping. Only script data already
+    # present in the fetched product HTML is examined; scripts are not run.
     title = None
     product_id = None
     current_price = None
     image_url = None
+    description = None
+    rating = None
+    review_count = None
+    specifications: list[dict[str, str]] = []
+    reviews: list[dict[str, str]] = []
     for document in embedded_json_documents(html):
         for root in _nodes(document):
             widgets = root.get("widgetStates")
@@ -291,6 +379,25 @@ def extract_ozon_product(html: str, page_url: str) -> Offer | None:
                             if isinstance(candidate, str) and candidate.startswith("https://"):
                                 image_url = candidate
                                 break
+                elif "webdescription" in name and not description:
+                    description = _ozon_plain_text(
+                        widget.get("description") or widget.get("html") or widget.get("content")
+                    )
+                elif "webcharacteristics" in name and not specifications:
+                    specifications = _ozon_characteristics(widget)
+                elif ("score" in name or "rating" in name) and "list" not in name:
+                    raw_rating = _ozon_named_scalar(
+                        widget, ("ratingValue", "averageRating", "rating")
+                    )
+                    candidate_rating = _number(raw_rating)
+                    if candidate_rating is not None and candidate_rating <= 5:
+                        rating = candidate_rating
+                    raw_count = _ozon_named_scalar(
+                        widget, ("reviewCount", "reviewsCount", "feedbackCount", "feedbacks", "ratingCount")
+                    )
+                    review_count = _review_total(raw_count) or review_count
+                elif "review" in name and "list" in name and not reviews:
+                    reviews = _ozon_review_entries(widget)
     if not title or current_price is None:
         return None
     return Offer(
@@ -301,6 +408,11 @@ def extract_ozon_product(html: str, page_url: str) -> Offer | None:
         url=page_url,
         external_id=str(product_id or _ozon_sku_from_url(page_url) or "") or None,
         image_url=image_url,
+        description=description,
+        rating=rating,
+        review_count=review_count,
+        specifications=specifications,
+        reviews=reviews,
     )
 
 

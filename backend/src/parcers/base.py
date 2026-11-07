@@ -34,6 +34,7 @@ class Offer:
     rating: float | None = None
     review_count: int | None = None
     specifications: list[dict[str, str]] = field(default_factory=list)
+    reviews: list[dict[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.title = self.title.strip()

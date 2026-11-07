@@ -24,6 +24,25 @@ class WildberriesRecordMappingTests(unittest.TestCase):
         self.assertTrue(offer.in_stock)
         self.assertEqual(offer.image_url, "https://example.org/image.webp")
 
+    def test_maps_wb_description_reviews_rating_and_characteristics(self):
+        offer = wb_record_to_offer({
+            "id": 321,
+            "name": "Кружка Example",
+            "salePriceU": 159900,
+            "description": "Керамическая кружка.",
+            "reviewRating": 4.6,
+            "feedbacks": 34,
+            "characteristics": '{"Объём":"350 мл","Цвет":"Синий"}',
+        })
+        self.assertIsNotNone(offer)
+        self.assertEqual(offer.description, "Керамическая кружка.")
+        self.assertEqual(offer.rating, 4.6)
+        self.assertEqual(offer.review_count, 34)
+        self.assertEqual(offer.specifications, [
+            {"name": "Объём", "value": "350 мл"},
+            {"name": "Цвет", "value": "Синий"},
+        ])
+
     def test_rejects_missing_identity_or_price(self):
         self.assertIsNone(wb_record_to_offer({"id": 12, "name": "No price"}))
         self.assertIsNone(wb_record_to_offer({"id": "bad", "name": "Item", "salePriceU": 1000}))

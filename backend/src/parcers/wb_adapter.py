@@ -6,6 +6,7 @@ records from an approved/licensed data source via the async source callable.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
+import json
 from typing import Any
 
 from .base import DisabledAdapter, Offer, ProviderResult, SearchStatus
@@ -27,6 +28,37 @@ def _rubles_from_kopecks(value: Any) -> float | None:
     if kopecks <= 0:
         return None
     return kopecks / 100
+
+
+def _wb_specifications(value: Any) -> list[dict[str, str]]:
+    if isinstance(value, dict):
+        pairs = value.items()
+    elif isinstance(value, list):
+        pairs = ((item.get("name"), item.get("value")) for item in value if isinstance(item, dict))
+    elif isinstance(value, str) and value.strip():
+        try:
+            decoded = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            decoded = None
+        if isinstance(decoded, dict):
+            pairs = decoded.items()
+        elif isinstance(decoded, list):
+            pairs = ((item.get("name"), item.get("value")) for item in decoded if isinstance(item, dict))
+        else:
+            pairs = [("Характеристики", value)]
+    else:
+        return []
+    specifications = []
+    for name, raw_value in pairs:
+        if name is None or raw_value is None:
+            continue
+        label = str(name).strip()
+        text = str(raw_value).strip()
+        if label and text:
+            specifications.append({"name": label[:120], "value": text[:500]})
+        if len(specifications) >= 30:
+            break
+    return specifications
 
 
 def wb_record_to_offer(record: Any) -> Offer | None:
@@ -73,6 +105,24 @@ def wb_record_to_offer(record: Any) -> Offer | None:
         in_stock = None
 
     brand = str(_read(record, "brand", "") or "").strip() or None
+    description = str(_read(record, "description", "") or "").strip()[:5000] or None
+    rating = None
+    raw_rating = _read(record, "reviewRating", _read(record, "rating"))
+    try:
+        rating = float(raw_rating) if raw_rating is not None else None
+    except (TypeError, ValueError):
+        pass
+    if rating is not None and not 0 < rating <= 5:
+        rating = None
+    review_count = None
+    raw_review_count = _read(record, "feedbacks", _read(record, "feedback_count"))
+    try:
+        review_count = int(raw_review_count) if raw_review_count is not None else None
+    except (TypeError, ValueError):
+        pass
+    if review_count is not None and review_count < 0:
+        review_count = None
+    specifications = _wb_specifications(_read(record, "characteristics"))
     return Offer(
         marketplace="Wildberries",
         title=title,
@@ -84,6 +134,10 @@ def wb_record_to_offer(record: Any) -> Offer | None:
         gtin=None,
         in_stock=in_stock,
         image_url=image_url,
+        description=description,
+        rating=rating,
+        review_count=review_count,
+        specifications=specifications,
     )
 
 

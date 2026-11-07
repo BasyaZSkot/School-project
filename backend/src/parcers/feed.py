@@ -84,6 +84,17 @@ class JsonFeedAdapter(DisabledAdapter):
                 for spec in raw_specs[:30]
                 if isinstance(spec, dict) and spec.get("name") and spec.get("value")
             ] if isinstance(raw_specs, list) else []
+            raw_reviews = item.get("reviews")
+            reviews = [
+                {
+                    "body": str(review["body"]).strip()[:1200],
+                    "author": str(review.get("author") or "Покупатель").strip()[:120],
+                    "date": str(review.get("date") or "").strip()[:40],
+                    "rating": str(review.get("rating") or "").strip()[:10],
+                }
+                for review in raw_reviews[:10]
+                if isinstance(review, dict) and review.get("body")
+            ] if isinstance(raw_reviews, list) else []
             return Offer(
                 marketplace=self.marketplace,
                 title=str(item["title"]),
@@ -100,6 +111,7 @@ class JsonFeedAdapter(DisabledAdapter):
                 rating=rating,
                 review_count=review_count,
                 specifications=specifications,
+                reviews=reviews,
             )
         except (KeyError, TypeError, ValueError):
             return None
