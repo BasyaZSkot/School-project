@@ -18,6 +18,9 @@ class PublicMarketplaceHtmlTests(unittest.TestCase):
         {"@type":"Product","name":"Наушники Example","sku":"sku-1",
          "url":"https://www.ozon.ru/product/example-1/",
          "image":"https://cdn.ozon.ru/image.webp",
+         "description":"Беспроводные наушники с шумоподавлением.",
+         "aggregateRating":{"@type":"AggregateRating","ratingValue":"4.7","reviewCount":"123"},
+         "additionalProperty":[{"@type":"PropertyValue","name":"Цвет","value":"Чёрный"}],
          "brand":{"@type":"Brand","name":"Example"},
          "offers":{"@type":"Offer","price":"12990","priceCurrency":"RUB",
                    "availability":"https://schema.org/InStock"}}
@@ -29,6 +32,10 @@ class PublicMarketplaceHtmlTests(unittest.TestCase):
         self.assertEqual(offers[0].price, 12990.0)
         self.assertEqual(offers[0].brand, "Example")
         self.assertTrue(offers[0].in_stock)
+        self.assertEqual(offers[0].description, "Беспроводные наушники с шумоподавлением.")
+        self.assertEqual(offers[0].rating, 4.7)
+        self.assertEqual(offers[0].review_count, 123)
+        self.assertEqual(offers[0].specifications, [{"name": "Цвет", "value": "Чёрный"}])
 
     def test_ignores_product_urls_outside_marketplace(self):
         html = """

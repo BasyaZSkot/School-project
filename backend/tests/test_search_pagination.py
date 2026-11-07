@@ -62,28 +62,25 @@ class SearchPaginationTests(unittest.TestCase):
 
 
 class MergingAdapter:
-    """Endless catalogue where every second card duplicates the previous title."""
+    """Same catalog exposed by each marketplace, merged across marketplaces."""
 
-    marketplace = "Yandex Market"
+    def __init__(self, marketplace: str):
+        self.marketplace = marketplace
 
-    # Effectively unlimited unless a test narrows it, to exercise pagination
-    # well beyond the old 50-item provider cap.
     supply = 100_000
 
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
-        offers = []
-        for index in range(min(self.supply, limit)):
-            title_index = index - 1 if index == 1 else index
-            offers.append(
-                Offer(
-                    marketplace=self.marketplace,
-                    title=f"item {title_index:03d}",
-                    price=100 + index,
-                    currency="RUB",
-                    url=f"https://market.example/items/{index}",
-                    external_id=f"ym-{index}",
-                )
+        offers = [
+            Offer(
+                marketplace=self.marketplace,
+                title=f"item {index:03d}",
+                price=100 + index,
+                currency="RUB",
+                url=f"https://{self.marketplace.lower()}.example/items/{index}",
+                external_id=f"{self.marketplace}-{index}",
             )
+            for index in range(min(self.supply, limit))
+        ]
         return ProviderResult(
             marketplace=self.marketplace,
             status=SearchStatus.READY,
@@ -92,14 +89,39 @@ class MergingAdapter:
         )
 
 
+class SameTitleAdapter:
+    marketplace = "Ozon"
+
+    async def search(self, query: str, limit: int = 20) -> ProviderResult:
+        return ProviderResult(
+            marketplace=self.marketplace,
+            status=SearchStatus.READY,
+            search_url="https://example.com/search",
+            offers=[
+                Offer(
+                    marketplace=self.marketplace,
+                    title="Одинаковое название товара",
+                    price=100 + index,
+                    currency="RUB",
+                    url=f"https://ozon.example/items/{index}",
+                    external_id=f"ozon-{index}",
+                )
+                for index in range(min(80, limit))
+            ],
+        )
+
+
 class MergedProductsKeepPaginationTests(unittest.TestCase):
     def test_load_more_stays_available_when_grouping_merges_two_offers(self):
-        service = MarketplaceSearchService(adapters=[MergingAdapter()])
+        service = MarketplaceSearchService(adapters=[
+            MergingAdapter("Ozon"), MergingAdapter("Wildberries"),
+        ])
         first = asyncio.run(service.search("phone", limit=20, offset=0))
-        # 21 offers were fetched, two of them merged -> exactly 20 products,
-        # but the provider filled its quota, so more cards exist.
+        # The providers return matching products; their offers merge into
+        # cross-marketplace cards, while the provider still has more products.
         self.assertEqual(len(first["products"]), 20)
-        self.assertEqual(first["total_products"], 20)
+        self.assertEqual(first["total_products"], 21)
+        self.assertEqual(len(first["products"][0]["offers"]), 2)
         self.assertTrue(first["has_more"])
 
         second = asyncio.run(service.search("phone", limit=20, offset=20))
@@ -107,7 +129,7 @@ class MergedProductsKeepPaginationTests(unittest.TestCase):
         self.assertTrue(second["has_more"])
 
     def test_no_more_once_the_fetch_cap_is_exhausted(self):
-        adapter = MergingAdapter()
+        adapter = MergingAdapter("Ozon")
         adapter.supply = PROVIDER_FETCH_CAP  # exactly the ceiling, nothing beyond it
         service = MarketplaceSearchService(adapters=[adapter])
         last_offset = (PROVIDER_FETCH_CAP // 20 - 1) * 20
@@ -120,6 +142,21 @@ class MergedProductsKeepPaginationTests(unittest.TestCase):
         self.assertFalse(result["has_more"])
 
 
+class SameMarketplaceListingsPaginationTests(unittest.TestCase):
+    def test_second_and_third_load_more_return_new_same_title_products(self):
+        service = MarketplaceSearchService(adapters=[SameTitleAdapter()])
+        pages = [
+            asyncio.run(service.search("item", limit=20, offset=offset))
+            for offset in (0, 20, 40, 60)
+        ]
+        ids = [[product["offers"][0]["external_id"] for product in page["products"]]
+               for page in pages]
+        self.assertEqual([len(page["products"]) for page in pages], [20, 20, 20, 20])
+        self.assertTrue(all(page["has_more"] for page in pages[:3]))
+        self.assertFalse(pages[3]["has_more"])
+        self.assertEqual(len(set(sum(ids, []))), 80)
+
+
 class StillHasMoreFarBeyondOldCapTests(unittest.TestCase):
     """Regression test: the "show more" button used to disappear after just
     one or two clicks, as soon as provider_limit reached the old 50-item cap
@@ -129,7 +166,9 @@ class StillHasMoreFarBeyondOldCapTests(unittest.TestCase):
     """
 
     def test_load_more_survives_many_clicks(self):
-        service = MarketplaceSearchService(adapters=[MergingAdapter()])
+        service = MarketplaceSearchService(adapters=[
+            MergingAdapter("Ozon"), MergingAdapter("Wildberries"),
+        ])
         offset = 0
         clicks = 0
         while True:

@@ -14,7 +14,11 @@ let activeQuery = "";
 let nextOffset = 0;
 let productCount = 0;
 let offerCount = 0;
+let searchSequence = 0;
+let detailRequestSequence = 0;
+const loadedProductIds = new Set();
 const DEFAULT_PAGE_SIZE = 20;
+const productDialog = document.querySelector("#product-dialog");
 
 const providerMeta = {
   "Ozon": { logo: "O", className: "ozon-logo" },
@@ -84,6 +88,7 @@ function renderOffers(products, query, append) {
     offersList.replaceChildren();
     productCount = 0;
     offerCount = 0;
+    loadedProductIds.clear();
   }
   if (!products.length && !append) {
     offersWrap.hidden = true;
@@ -91,6 +96,9 @@ function renderOffers(products, query, append) {
   }
   offersWrap.hidden = false;
   for (const product of products) {
+    const productId = product.product_id || product.match_key;
+    if (append && productId && loadedProductIds.has(productId)) continue;
+    if (productId) loadedProductIds.add(productId);
     const offers = Array.isArray(product.offers) ? product.offers : [];
     if (!offers.length) continue;
     const card = element("article", "offer-card");
@@ -134,6 +142,10 @@ function renderOffers(products, query, append) {
       const right = element("div", "offer-right");
       right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
       const actions = element("div", "offer-actions");
+      const detailsButton = element("button", "details-button", "Подробнее");
+      detailsButton.type = "button";
+      detailsButton.addEventListener("click", () => openProductDetails(offer));
+      actions.append(detailsButton);
       const link = element("a", "offer-open", "К товару ↗");
       link.href = offer.url;
       link.target = "_blank";
@@ -172,10 +184,74 @@ function renderOffers(products, query, append) {
   offersCaption.textContent = productCount + " товаров · " + offerCount + " предложений";
   count.textContent = productCount + " товаров";
 }
-async function fetchPage(offset, append) {
-  const params = new URLSearchParams({ q: activeQuery, limit: "20", offset: String(offset) });
+function renderDetailFields(data, fallbackOffer) {
+  const details = data || fallbackOffer || {};
+  const description = details.description || "Описание не опубликовано в доступной разметке карточки.";
+  document.querySelector("#detail-description").textContent = description;
+  const rating = Number(details.rating);
+  document.querySelector("#detail-rating").textContent =
+    Number.isFinite(rating) && rating > 0 ? rating.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + " из 5" : "Нет данных";
+  const hasReviewCount = details.review_count !== null && details.review_count !== undefined && details.review_count !== "";
+  const reviews = Number(details.review_count);
+  document.querySelector("#detail-reviews").textContent =
+    hasReviewCount && Number.isFinite(reviews) && reviews >= 0 ? reviews.toLocaleString("ru-RU") : "Нет данных";
+
+  const specs = document.querySelector("#detail-specs");
+  specs.replaceChildren();
+  for (const item of Array.isArray(details.specifications) ? details.specifications : []) {
+    if (!item || !item.name || !item.value) continue;
+    specs.append(element("dt", "", item.name), element("dd", "", item.value));
+  }
+  if (!specs.childElementCount) specs.append(
+    element("dt", "detail-muted", "Сведения"),
+    element("dd", "detail-muted", "Характеристики не опубликованы.")
+  );
+}
+
+async function openProductDetails(offer) {
+  const requestSequence = ++detailRequestSequence;
+  const title = offer.title || "Товар";
+  document.querySelector("#detail-market").textContent = offer.marketplace || "Маркетплейс";
+  document.querySelector("#detail-title").textContent = title;
+  document.querySelector("#detail-price-value").textContent = money(offer.price, offer.currency);
+  const link = document.querySelector("#detail-link");
+  link.href = offer.url;
+  const image = document.querySelector("#detail-image");
+  image.hidden = !offer.image_url;
+  if (offer.image_url) image.src = offer.image_url;
+  else image.removeAttribute("src");
+  image.alt = title;
+  document.querySelector("#detail-status").textContent = "Загружаем доступные сведения о товаре…";
+  renderDetailFields(offer, offer);
+  productDialog.showModal();
+
+  const params = new URLSearchParams({ marketplace: offer.marketplace, product_url: offer.url });
+  try {
+    const response = await fetch("/api/product-details?" + params, {
+      headers: { Accept: "application/json" }
+    });
+    const data = await response.json();
+    if (requestSequence !== detailRequestSequence) return;
+    if (!response.ok) throw new Error(data.detail || "Не удалось загрузить подробности.");
+    renderDetailFields(data.details_available ? data : offer, offer);
+    document.querySelector("#detail-status").textContent = data.details_available
+      ? "Данные прочитаны из доступной публичной разметки карточки."
+      : (data.message || "Подробные поля не найдены на публичной странице.");
+  } catch (error) {
+    if (requestSequence !== detailRequestSequence) return;
+    renderDetailFields(offer, offer);
+    document.querySelector("#detail-status").textContent = error.message || "Не удалось загрузить подробности.";
+  }
+}
+
+document.querySelector("#detail-close").addEventListener("click", () => productDialog.close());
+
+async function fetchPage(offset, append, sequence = searchSequence) {
+  const query = activeQuery;
+  const params = new URLSearchParams({ q: query, limit: "20", offset: String(offset) });
   const response = await fetch("/api/search?" + params, { headers: { Accept: "application/json" } });
   const data = await response.json();
+  if (sequence !== searchSequence) return;
   if (!response.ok) throw new Error(data.detail || "Не удалось выполнить поиск.");
   if (!append) {
     title.textContent = "Результаты для «" + data.query + "»";
@@ -203,6 +279,7 @@ async function fetchPage(offset, append) {
 async function runSearch(query) {
   activeQuery = query.trim();
   if (!activeQuery) return;
+  const sequence = ++searchSequence;
   input.value = activeQuery;
   button.disabled = true;
   button.textContent = "Ищем…";
@@ -213,7 +290,7 @@ async function runSearch(query) {
   message(notice, "");
   providerGrid.replaceChildren(element("div", "loading-card", "Ищем на трёх площадках…"));
   try {
-    await fetchPage(0, false);
+    await fetchPage(0, false, sequence);
   } catch (error) {
     providerGrid.replaceChildren();
     title.textContent = "Поиск не выполнен";
@@ -221,8 +298,10 @@ async function runSearch(query) {
     emptyState.querySelector("strong").textContent = "Не удалось выполнить поиск";
     emptyState.querySelector("span").textContent = error.message || "Попробуй ещё раз.";
   } finally {
-    button.disabled = false;
-    button.textContent = "Найти →";
+    if (sequence === searchSequence) {
+      button.disabled = false;
+      button.textContent = "Найти →";
+    }
   }
 }
 form.addEventListener("submit", event => {
@@ -236,10 +315,11 @@ moreButton.addEventListener("click", async () => {
   moreButton.disabled = true;
   const labelBeforeClick = moreButton.textContent;
   moreButton.textContent = "Загружаем…";
+  const sequence = searchSequence;
   try {
     // fetchPage sets the button's next label itself, from real data; it
     // must be the last word on the label, so nothing here overwrites it.
-    await fetchPage(nextOffset, true);
+    await fetchPage(nextOffset, true, sequence);
   } catch (error) {
     message(notice, error.message);
     moreButton.textContent = labelBeforeClick;

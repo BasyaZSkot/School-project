@@ -309,17 +309,25 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             price = _price_from_offer({"price": raw_price})
             if price is not None:
                 break
-        if title and price is not None:
-            product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
-            return Offer(
-                marketplace=self.marketplace,
-                title=title,
-                price=price,
-                currency="RUB",
-                url=page_url,
-                external_id=product_id.group(1) if product_id else None,
-            )
-        return super()._extract_product(html, page_url)
+        structured = super()._extract_product(html, page_url)
+        if not title or price is None:
+            return structured
+        product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
+        offer = Offer(
+            marketplace=self.marketplace,
+            title=title,
+            price=price,
+            currency="RUB",
+            url=page_url,
+            external_id=product_id.group(1) if product_id else None,
+        )
+        if structured is not None:
+            offer.description = structured.description
+            offer.rating = structured.rating
+            offer.review_count = structured.review_count
+            offer.specifications = structured.specifications
+            offer.image_url = structured.image_url
+        return offer
 
     @classmethod
     def from_env(cls):

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 import asyncio
 import csv
@@ -102,6 +103,54 @@ async def search(
         return await search_service.search(q, limit, offset)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/product-details")
+async def product_details(
+    marketplace: str = Query(min_length=1, max_length=80),
+    product_url: str = Query(min_length=10, max_length=2048),
+):
+    allowed_domains = MARKETPLACE_DOMAINS.get(marketplace)
+    parsed = urlparse(product_url)
+    try:
+        safe_port = parsed.port in (None, 443)
+    except ValueError:
+        safe_port = False
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or not safe_port
+        or not allowed_domains
+        or not any(
+            parsed.hostname == domain or parsed.hostname.endswith("." + domain)
+            for domain in allowed_domains
+        )
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Ссылка должна вести на HTTPS-карточку выбранного маркетплейса",
+        )
+    try:
+        offer = await search_service.parse_product(marketplace, product_url)
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Карточка не ответила вовремя") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Некорректная ссылка на товар") from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Не удалось получить подробности с публичной страницы товара",
+        ) from exc
+    if offer is None:
+        return {
+            "details_available": False,
+            "marketplace": marketplace,
+            "url": product_url,
+            "message": "Публичная страница не содержит поддерживаемых подробностей товара.",
+        }
+    return {"details_available": True, **asdict(offer)}
 
 
 @app.post("/api/search/batch")

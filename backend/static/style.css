@@ -70,25 +70,51 @@ h1 span { color: var(--accent); }
 .offers-heading h3 { margin: 0; font-size: 18px; }
 .offers-heading span { color: var(--muted); font-size: 10px; }
 .offers-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,440px),1fr)); gap: 12px; }
-.offer-card { padding: 16px; }
-.offer-product-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.offer-product-head h3 { margin: 0; font-size: 13px; line-height: 1.5; }
+.offer-card { display: flex; flex-direction: column; gap: 13px; padding: 18px; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.offer-card:hover { border-color: #d4d0fb; box-shadow: 0 12px 30px #26375410; transform: translateY(-1px); }
+.offer-product-head { display: flex; align-items: flex-start; gap: 14px; margin: 0; }
+.offer-product-head h3 { flex: 1; margin: 0; font-size: 14px; line-height: 1.5; }
 .offer-product-image { width: 64px; height: 64px; flex: 0 0 64px; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; background: white; }
 .offer-rows { display: grid; gap: 8px; }
-.offer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding-top: 10px; border-top: 1px solid #eff1f5; }
+.offer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding-top: 12px; border-top: 1px solid #eff1f5; }
 .offer-info { flex: 1 1 200px; display: grid; gap: 3px; min-width: 0; }
 .offer-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 14px; }
 .offer-info strong { font-size: 12px; }
 .offer-info span { color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .offer-info .best-price-badge { width: fit-content; padding: 3px 6px; border-radius: 14px; color: #23754f; background: #e7f7ee; font-size: 10px; font-weight: 800; }
 .offer-price { white-space: nowrap; font-size: 14px; }
-.offer-actions { display: flex; align-items: center; gap: 8px; }
+.offer-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
 .offer-open { color: var(--accent); font-size: 11px; font-weight: 800; text-decoration: none; }
+.details-button { padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; color: #48566e; background: #fff; cursor: pointer; font-size: 9px; font-weight: 800; }
+.details-button:hover { border-color: #c9c4fb; color: var(--accent); background: #faf9ff; }
 .watch-button { padding: 8px 11px; border: 1px solid #dedbff; border-radius: 8px; color: var(--accent); background: #f7f6ff; cursor: pointer; font-size: 9px; font-weight: 800; }
 .load-more-button { display: block; margin: 18px auto 0; padding: 12px 20px; border: 1px solid #dcd8ff; border-radius: 11px; color: var(--accent); background: #fff; cursor: pointer; font-size: 11px; font-weight: 800; }
 .load-more-button:hover { border-color: var(--accent); background: #f8f7ff; }
 .load-more-button:disabled { opacity: .6; cursor: wait; }
 .load-more-button[hidden],.offers-wrap[hidden],.empty-state[hidden],.notice[hidden] { display: none; }
+.product-dialog { width: min(720px, calc(100% - 28px)); max-height: min(86vh, 860px); padding: 24px; overflow: auto; border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 80px #101b3150; }
+.product-dialog::backdrop { background: #101b3170; backdrop-filter: blur(3px); }
+.dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.detail-market { color: var(--accent); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; }
+.dialog-header h2 { margin: 6px 0 0; font-size: clamp(18px, 3vw, 23px); line-height: 1.35; }
+.dialog-close { width: 36px; height: 36px; flex: 0 0 36px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); background: #fff; cursor: pointer; font-size: 23px; line-height: 1; }
+.detail-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; margin-top: 20px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fafbfe; }
+.detail-image { width: 76px; height: 76px; object-fit: contain; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.detail-image[hidden] { display: none; }
+.detail-price { display: grid; gap: 5px; margin-right: auto; }
+.detail-price span,.detail-section h3 { color: var(--muted); font-size: 10px; font-weight: 700; }
+.detail-price strong { font-size: 20px; }
+.detail-summary .button { min-height: 38px; }
+.detail-status { margin: 12px 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.detail-section { min-width: 0; padding: 16px 0; border-top: 1px solid #eff1f5; }
+.detail-section h3 { margin: 0 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+.detail-section p { margin: 0; color: #46536a; font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+.detail-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.detail-specs { display: grid; grid-template-columns: minmax(120px, .55fr) minmax(0, 1fr); gap: 0 14px; margin: 0; }
+.detail-specs dt,.detail-specs dd { margin: 0; padding: 8px 0; border-top: 1px solid #eff1f5; font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.detail-specs dt { color: var(--muted); }
+.detail-specs dd { color: #354258; }
+.detail-specs .detail-muted { grid-column: 1 / -1; color: var(--muted); }
 .empty-state,.empty-panel { padding: 32px 18px; border: 1px dashed #d8deea; border-radius: 13px; color: var(--muted); background: #ffffff9c; text-align: center; }
 .empty-state { display: grid; justify-items: center; gap: 7px; margin-top: 15px; }
 .empty-state strong { color: #354258; font-size: 12px; }
@@ -137,6 +163,8 @@ h1 span { color: var(--accent); }
   .page-intro,.page-intro-compact { padding-top: 39px; }
   .provider-grid,.source-grid { grid-template-columns: 1fr; }
   .offers-list { grid-template-columns: 1fr; }
+  .product-dialog { padding: 18px; }
+  .detail-metrics { grid-template-columns: 1fr; gap: 0; }
   .monitor-card { grid-template-columns: 1fr; align-items: flex-start; }
   .monitor-controls { flex-wrap: wrap; justify-content: flex-start; }
   .section-toolbar { align-items: flex-start; flex-direction: column; }

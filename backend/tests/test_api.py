@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from src.parcers.api import app
+from src.parcers.base import Offer
 
 
 class MarketplaceApiTests(unittest.TestCase):
@@ -41,6 +42,39 @@ class MarketplaceApiTests(unittest.TestCase):
         self.assertEqual(payload["products"], [])
         self.assertTrue(all(provider["search_url"].startswith("https://") for provider in payload["providers"]))
         mocked.assert_awaited_once_with("кофемашина", 20, 0)
+
+    def test_product_details_returns_public_metadata(self):
+        offer = Offer(
+            marketplace="Ozon",
+            title="Наушники Example",
+            price=4590,
+            currency="RUB",
+            url="https://www.ozon.ru/product/headphones-777/",
+            description="Беспроводные наушники.",
+            rating=4.7,
+            review_count=123,
+            specifications=[{"name": "Цвет", "value": "Чёрный"}],
+        )
+        with patch("src.parcers.api.search_service.parse_product", new_callable=AsyncMock) as mocked:
+            mocked.return_value = offer
+            response = self.client.get("/api/product-details", params={
+                "marketplace": "Ozon", "product_url": offer.url,
+            })
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["details_available"])
+        self.assertEqual(payload["description"], "Беспроводные наушники.")
+        self.assertEqual(payload["rating"], 4.7)
+        self.assertEqual(payload["review_count"], 123)
+        mocked.assert_awaited_once_with("Ozon", offer.url)
+
+    def test_product_details_rejects_other_hosts(self):
+        with patch("src.parcers.api.search_service.parse_product", new_callable=AsyncMock) as mocked:
+            response = self.client.get("/api/product-details", params={
+                "marketplace": "Ozon", "product_url": "https://evil.example/product/1",
+            })
+        self.assertEqual(response.status_code, 422)
+        mocked.assert_not_awaited()
 
     def test_search_rejects_blank_and_invalid_limit(self):
         self.assertEqual(self.client.get("/api/search", params={"q": "   "}).status_code, 400)

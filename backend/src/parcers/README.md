@@ -1,5 +1,9 @@
 # MultiMarket marketplace connectors
 
+## Parser guide
+
+See [PARSER_GUIDE.md](PARSER_GUIDE.md) for a Russian walkthrough of every parser module and the WB/Ozon parsing methods.
+
 ## What is implemented
 
 - One asynchronous search service for Ozon, Wildberries and Yandex Market.

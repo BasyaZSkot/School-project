@@ -22,11 +22,23 @@ class WildberriesAdapter(PublicHtmlSearchAdapter):
 
     def _extract_product(self, html: str, page_url: str):
         product_id = re.search(r"/catalog/(\d+)(?:/|$)", page_url)
+        embedded = None
         if product_id:
-            for offer in extract_wildberries_embedded(html, 50):
-                if offer.external_id == product_id.group(1):
-                    return offer
-        return super()._extract_product(html, page_url)
+            embedded = next(
+                (offer for offer in extract_wildberries_embedded(html, 50)
+                 if offer.external_id == product_id.group(1)),
+                None,
+            )
+        structured = super()._extract_product(html, page_url)
+        if embedded is None:
+            return structured
+        if structured is not None:
+            embedded.description = structured.description
+            embedded.rating = structured.rating
+            embedded.review_count = structured.review_count
+            embedded.specifications = structured.specifications
+            embedded.image_url = embedded.image_url or structured.image_url
+        return embedded
 
     @classmethod
     def from_env(cls):

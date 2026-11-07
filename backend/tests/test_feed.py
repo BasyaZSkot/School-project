@@ -21,11 +21,19 @@ class JsonFeedAdapterMappingTests(unittest.TestCase):
             "url": "https://market.example/item/42",
             "image_url": "https://img.example/item.webp",
             "in_stock": True,
+            "description": "A useful item.",
+            "rating": 4.8,
+            "review_count": 27,
+            "specifications": [{"name": "Color", "value": "Blue"}],
         })
         self.assertIsNotNone(offer)
         self.assertEqual(offer.price, 1299.5)
         self.assertEqual(offer.currency, "RUB")
         self.assertEqual(offer.marketplace, "Test Market")
+        self.assertEqual(offer.description, "A useful item.")
+        self.assertEqual(offer.rating, 4.8)
+        self.assertEqual(offer.review_count, 27)
+        self.assertEqual(offer.specifications, [{"name": "Color", "value": "Blue"}])
 
     def test_rejects_non_https_product_urls(self):
         self.assertIsNone(self.adapter._map_offer({

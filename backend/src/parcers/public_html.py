@@ -60,6 +60,76 @@ def _as_text(value):
     return str(value).strip() if value is not None else None
 
 
+def _number(value) -> float | None:
+    if value is None or value == "":
+        return None
+    raw = re.sub(r"[^0-9.,]", "", str(value))
+    if raw.count(",") + raw.count(".") > 1:
+        return None
+    try:
+        number = float(raw.replace(",", "."))
+    except ValueError:
+        return None
+    return number if number > 0 else None
+
+
+def _review_total(value) -> int | None:
+    if value is None or value == "":
+        return None
+    digits = re.sub(r"[^0-9]", "", str(value))
+    try:
+        count = int(digits)
+    except ValueError:
+        return None
+    return count if count >= 0 else None
+
+
+def _clean_description(value) -> str | None:
+    text = _as_text(value)
+    if not text:
+        return None
+    text = " ".join(text.split())
+    return text[:5000] or None
+
+
+def _product_metadata(item: dict) -> dict:
+    aggregate = item.get("aggregateRating") or item.get("rating") or {}
+    if isinstance(aggregate, list):
+        aggregate = next((value for value in aggregate if isinstance(value, dict)), {})
+    if not isinstance(aggregate, dict):
+        aggregate = {}
+
+    rating = _number(aggregate.get("ratingValue") or item.get("ratingValue"))
+    if rating is not None and rating > 5:
+        rating = None
+    review_count = _review_total(
+        aggregate.get("reviewCount") or aggregate.get("ratingCount")
+        or item.get("reviewCount") or item.get("ratingCount")
+    )
+
+    raw_specs = item.get("additionalProperty") or item.get("specifications") or []
+    if isinstance(raw_specs, dict):
+        raw_specs = [raw_specs]
+    specifications = []
+    if isinstance(raw_specs, list):
+        for prop in raw_specs:
+            if not isinstance(prop, dict):
+                continue
+            name = _as_text(prop.get("name"))
+            value = _as_text(prop.get("value") or prop.get("valueReference"))
+            if name and value:
+                specifications.append({"name": name[:120], "value": value[:500]})
+            if len(specifications) >= 30:
+                break
+
+    return {
+        "description": _clean_description(item.get("description")),
+        "rating": rating,
+        "review_count": review_count,
+        "specifications": specifications,
+    }
+
+
 def _price_from_offer(offer: dict) -> float | None:
     candidates = [offer.get("price"), offer.get("lowPrice")]
     specification = offer.get("priceSpecification")
@@ -196,6 +266,7 @@ class PublicHtmlSearchAdapter:
                     brand = _as_text(item.get("brand"))
                     availability = str(raw_offer.get("availability") or "").lower()
                     in_stock = True if "instock" in availability else False if "outofstock" in availability else None
+                    details = _product_metadata(item)
                     offers.append(Offer(
                         marketplace=self.marketplace,
                         title=title,
@@ -207,6 +278,7 @@ class PublicHtmlSearchAdapter:
                         gtin=str(item.get("gtin13") or item.get("gtin") or "") or None,
                         in_stock=in_stock,
                         image_url=image_url,
+                        **details,
                     ))
                     seen.add(product_url)
                     if len(offers) >= limit:
@@ -232,10 +304,13 @@ class PublicHtmlSearchAdapter:
             image_url = urljoin(page_url, image) if image else None
             if image_url and urlparse(image_url).scheme != "https":
                 image_url = None
+            details = _product_metadata(item)
             offers.append(Offer(
                 marketplace=self.marketplace, title=title, price=price,
                 currency=currency, url=product_url, image_url=image_url,
                 external_id=item.get("sku") or None,
+                brand=item.get("brand") or None,
+                **details,
             ))
             seen.add(product_url)
             if len(offers) >= limit:

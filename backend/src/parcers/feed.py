@@ -64,6 +64,26 @@ class JsonFeedAdapter(DisabledAdapter):
                 image_parsed = urlparse(str(image_url))
                 if image_parsed.scheme != "https" or not image_parsed.netloc:
                     image_url = None
+            rating = None
+            try:
+                rating = float(item["rating"]) if item.get("rating") is not None else None
+            except (TypeError, ValueError):
+                pass
+            if rating is not None and not 0 < rating <= 5:
+                rating = None
+            review_count = None
+            try:
+                review_count = int(item["review_count"]) if item.get("review_count") is not None else None
+            except (TypeError, ValueError):
+                pass
+            if review_count is not None and review_count < 0:
+                review_count = None
+            raw_specs = item.get("specifications")
+            specifications = [
+                {"name": str(spec["name"]).strip()[:120], "value": str(spec["value"]).strip()[:500]}
+                for spec in raw_specs[:30]
+                if isinstance(spec, dict) and spec.get("name") and spec.get("value")
+            ] if isinstance(raw_specs, list) else []
             return Offer(
                 marketplace=self.marketplace,
                 title=str(item["title"]),
@@ -76,6 +96,10 @@ class JsonFeedAdapter(DisabledAdapter):
                 gtin=str(item["gtin"]) if item.get("gtin") else None,
                 in_stock=item.get("in_stock") if isinstance(item.get("in_stock"), bool) else None,
                 image_url=str(image_url) if image_url else None,
+                description=str(item["description"]).strip()[:5000] if item.get("description") else None,
+                rating=rating,
+                review_count=review_count,
+                specifications=specifications,
             )
         except (KeyError, TypeError, ValueError):
             return None

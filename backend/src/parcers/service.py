@@ -114,31 +114,50 @@ class MarketplaceSearchService:
                     seen.add(identity)
                     offers.append(offer)
 
-        grouped: dict[str, list[Offer]] = defaultdict(list)
+        # Match the same listing across different marketplaces, but never
+        # collapse two distinct listings from one marketplace into one card.
+        # If several same-market listings share a GTIN/title, pair them in
+        # stable order with listings from other marketplaces where possible.
+        grouped: dict[str, list[list[Offer]]] = defaultdict(list)
         for offer in offers:
-            grouped[offer_group_key(offer)].append(offer)
+            buckets = grouped[offer_group_key(offer)]
+            product_offers = next(
+                (bucket for bucket in buckets
+                 if all(item.marketplace != offer.marketplace for item in bucket)),
+                None,
+            )
+            if product_offers is None:
+                product_offers = []
+                buckets.append(product_offers)
+            product_offers.append(offer)
 
         products = []
-        for key, product_offers in grouped.items():
-            product_offers.sort(key=lambda item: (item.currency, item.price))
-            lowest_by_currency = {}
-            for offer in product_offers:
-                lowest_by_currency.setdefault(offer.currency, offer.price)
-            products.append({
-                "match_key": key,
-                "title": product_offers[0].title,
-                "lowest_price_by_currency": lowest_by_currency,
-                "offers": [{
-                    "marketplace": item.marketplace,
-                    "title": item.title,
-                    "price": item.price,
-                    "currency": item.currency,
-                    "url": item.url,
-                    "in_stock": item.in_stock,
-                    "image_url": item.image_url,
-                    "external_id": item.external_id,
-                } for item in product_offers],
-            })
+        for key, product_buckets in grouped.items():
+            for bucket_index, product_offers in enumerate(product_buckets):
+                product_offers.sort(key=lambda item: (item.currency, item.price))
+                lowest_by_currency = {}
+                for offer in product_offers:
+                    lowest_by_currency.setdefault(offer.currency, offer.price)
+                products.append({
+                    "product_id": f"{key}:{bucket_index}",
+                    "match_key": key,
+                    "title": product_offers[0].title,
+                    "lowest_price_by_currency": lowest_by_currency,
+                    "offers": [{
+                        "marketplace": item.marketplace,
+                        "title": item.title,
+                        "price": item.price,
+                        "currency": item.currency,
+                        "url": item.url,
+                        "in_stock": item.in_stock,
+                        "image_url": item.image_url,
+                        "external_id": item.external_id,
+                        "description": item.description,
+                        "rating": item.rating,
+                        "review_count": item.review_count,
+                        "specifications": item.specifications,
+                    } for item in product_offers],
+                })
         products.sort(key=lambda item: normalize_title(item["title"]))
         total_products = len(products)
         page_products = products[offset:offset + limit]

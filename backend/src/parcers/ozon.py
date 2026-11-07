@@ -23,7 +23,17 @@ class OzonAdapter(PublicHtmlSearchAdapter):
         return offers[:limit] if offers else super()._extract(html, page_url, limit)
 
     def _extract_product(self, html: str, page_url: str):
-        return extract_ozon_product(html, page_url) or super()._extract_product(html, page_url)
+        embedded = extract_ozon_product(html, page_url)
+        structured = super()._extract_product(html, page_url)
+        if embedded is None:
+            return structured
+        if structured is not None:
+            embedded.description = structured.description
+            embedded.rating = structured.rating
+            embedded.review_count = structured.review_count
+            embedded.specifications = structured.specifications
+            embedded.image_url = embedded.image_url or structured.image_url
+        return embedded
 
     @classmethod
     def from_env(cls):

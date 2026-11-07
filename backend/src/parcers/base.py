@@ -30,6 +30,10 @@ class Offer:
     gtin: str | None = None
     in_stock: bool | None = None
     image_url: str | None = None
+    description: str | None = None
+    rating: float | None = None
+    review_count: int | None = None
+    specifications: list[dict[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.title = self.title.strip()
