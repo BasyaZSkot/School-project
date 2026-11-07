@@ -192,13 +192,12 @@ async function fetchPage(offset, append) {
   }
   nextOffset = data.offset + (data.products || []).length;
   moreButton.hidden = !data.has_more || !(data.products || []).length;
-  // We only know exactly how many products are left once total_products is
-  // a firm count (i.e. not just "providers might have even more" headroom);
-  // otherwise DEFAULT_PAGE_SIZE is the best guess until the next page proves
-  // otherwise.
-  const known = Math.max(0, (data.total_products ?? 0) - nextOffset);
-  const nextBatch = known > 0 ? Math.min(DEFAULT_PAGE_SIZE, known) : DEFAULT_PAGE_SIZE;
-  moreButton.dataset.nextBatch = String(nextBatch);
+  // total_products only reflects every product that exists once every
+  // provider has run dry (exact_total); otherwise the backend only probed
+  // one item past the current page, so total_products is not a real count
+  // and DEFAULT_PAGE_SIZE is the only honest guess for the next click.
+  const remaining = data.exact_total ? Math.max(0, (data.total_products ?? 0) - nextOffset) : 0;
+  const nextBatch = remaining > 0 ? Math.min(DEFAULT_PAGE_SIZE, remaining) : DEFAULT_PAGE_SIZE;
   moreButton.textContent = `Показать ещё ${nextBatch} ${productsWord(nextBatch)}`;
 }
 async function runSearch(query) {
@@ -235,13 +234,16 @@ document.querySelectorAll(".example-query").forEach(item =>
 );
 moreButton.addEventListener("click", async () => {
   moreButton.disabled = true;
+  const labelBeforeClick = moreButton.textContent;
   moreButton.textContent = "Загружаем…";
   try {
+    // fetchPage sets the button's next label itself, from real data; it
+    // must be the last word on the label, so nothing here overwrites it.
     await fetchPage(nextOffset, true);
   } catch (error) {
     message(notice, error.message);
+    moreButton.textContent = labelBeforeClick;
   } finally {
     moreButton.disabled = false;
-    moreButton.textContent = "Показать ещё 20 товаров";
   }
 });

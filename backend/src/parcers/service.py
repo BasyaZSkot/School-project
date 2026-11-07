@@ -149,6 +149,13 @@ class MarketplaceSearchService:
         has_more = total_products > offset + limit or (
             provider_may_have_more and provider_limit < PROVIDER_FETCH_CAP
         )
+        # True only once every provider has returned fewer offers than we
+        # asked for, i.e. we did not just hit our own request size and stop
+        # early. We always ask for one extra item beyond the current page
+        # (offset + limit + 1) to cheaply learn "is there at least one more
+        # product?" -- so on a typical page, total_products is NOT the real
+        # total and must not be read as one.
+        exact_total = not provider_may_have_more
         return {
             "query": query,
             "providers": provider_results,
@@ -156,6 +163,7 @@ class MarketplaceSearchService:
             "offset": offset,
             "limit": limit,
             "total_products": total_products,
+            "exact_total": exact_total,
             "has_more": has_more,
             "total_offers": len(offers),
             "notice": None if offers else "Поиск завершён, но площадки не вернули читаемые карточки товаров. Попробуйте изменить запрос.",
