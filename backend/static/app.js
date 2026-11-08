@@ -19,6 +19,7 @@ let searchSequence = 0;
 let detailRequestSequence = 0;
 const loadedProductIds = new Set();
 const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_FILL_REQUESTS = 3;
 const productDialog = document.querySelector("#product-dialog");
 
 const providerMeta = {
@@ -99,9 +100,10 @@ function renderOffers(products, query, append) {
   }
   if (!products.length && !append) {
     offersWrap.hidden = true;
-    return;
+    return 0;
   }
   offersWrap.hidden = false;
+  let renderedCount = 0;
   for (const product of products) {
     const productId = product.product_id || product.match_key;
     if (append && productId && loadedProductIds.has(productId)) continue;
@@ -187,9 +189,11 @@ function renderOffers(products, query, append) {
     card.append(rows);
     offersList.append(card);
     productCount += 1;
+    renderedCount += 1;
   }
   offersCaption.textContent = productCount + " товаров · " + offerCount + " предложений";
   count.textContent = productCount + " товаров";
+  return renderedCount;
 }
 function renderDetailFields(data, fallbackOffer) {
   const details = data || fallbackOffer || {};
@@ -270,46 +274,83 @@ async function openProductDetails(offer) {
 
 document.querySelector("#detail-close").addEventListener("click", () => productDialog.close());
 
-async function fetchPage(offset, append, sequence = searchSequence) {
+async function fetchPage(offset, append, sequence = searchSequence, displayLimit = DEFAULT_PAGE_SIZE) {
   const query = activeQuery;
   const params = new URLSearchParams({
     q: query, limit: "20", offset: String(offset), session_id: activeSearchId
   });
   const response = await fetch("/api/search?" + params, { headers: { Accept: "application/json" } });
   const data = await response.json();
-  if (sequence !== searchSequence) return;
+  if (sequence !== searchSequence) return null;
   if (!response.ok) throw new Error(data.detail || "Не удалось выполнить поиск.");
+  const responseProducts = data.products || [];
+  const pageProducts = responseProducts.slice(0, displayLimit);
+  let renderedCount = 0;
   if (!append) {
     title.textContent = "Результаты для «" + data.query + "»";
     renderProviders(data.providers);
-    renderOffers(data.products || [], activeQuery, false);
-    emptyState.hidden = Boolean((data.products || []).length);
-    if (!(data.products || []).length) {
+    renderedCount = renderOffers(pageProducts, activeQuery, false);
+    emptyState.hidden = Boolean(responseProducts.length);
+    if (!responseProducts.length) {
       emptyState.querySelector("strong").textContent = "Товары не найдены";
       emptyState.querySelector("span").textContent = "Открой площадку или подключи разрешённый источник данных.";
     }
     message(notice, data.notice);
   } else {
-    renderOffers(data.products || [], activeQuery, true);
+    renderedCount = renderOffers(pageProducts, activeQuery, true);
   }
-  const pageProducts = data.products || [];
+  // Advance by consumed results, even if the browser skipped a duplicate card.
   nextOffset = data.offset + pageProducts.length;
-  const retryableEmptyPage = append && data.retryable && !pageProducts.length;
-  moreButton.hidden = retryableEmptyPage ? false : !data.has_more || !pageProducts.length;
+  const hasBufferedProducts = responseProducts.length > pageProducts.length;
+  const retryableEmptyPage = data.retryable && !responseProducts.length;
+  moreButton.hidden = retryableEmptyPage
+    ? false
+    : (!pageProducts.length || (!hasBufferedProducts && !data.has_more));
   if (append) {
     message(notice, data.retryable
       ? "Источник временно не ответил. Найденные товары сохранены — нажмите кнопку ещё раз, чтобы повторить загрузку."
       : "");
   }
   // total_products only reflects every product that exists once every
-  // provider has run dry (exact_total); otherwise the backend only probed
-  // one item past the current page, so total_products is not a real count
-  // and DEFAULT_PAGE_SIZE is the only honest guess for the next click.
+  // provider has run dry; otherwise the backend only probed one item past
+  // the current page, so DEFAULT_PAGE_SIZE is the only honest guess.
   const remaining = data.exact_total ? Math.max(0, (data.total_products ?? 0) - nextOffset) : 0;
   const nextBatch = remaining > 0 ? Math.min(DEFAULT_PAGE_SIZE, remaining) : DEFAULT_PAGE_SIZE;
   moreButton.textContent = data.retryable
     ? "Повторить загрузку"
     : `Показать ещё ${nextBatch} ${productsWord(nextBatch)}`;
+  return {
+    loaded: renderedCount,
+    consumed: pageProducts.length,
+    moreAvailable: !moreButton.hidden
+  };
+}
+async function topUpPage(firstPage, sequence) {
+  let loaded = firstPage?.loaded || 0;
+  let moreAvailable = Boolean(firstPage?.moreAvailable);
+  let requests = 1;
+  let lastButtonLabel = moreButton.textContent;
+  while (
+    loaded > 0
+    && loaded < DEFAULT_PAGE_SIZE
+    && moreAvailable
+    && requests < MAX_PAGE_FILL_REQUESTS
+  ) {
+    moreButton.textContent = "Загружаем…";
+    try {
+      const page = await fetchPage(nextOffset, true, sequence, DEFAULT_PAGE_SIZE - loaded);
+      if (!page) break;
+      requests += 1;
+      lastButtonLabel = moreButton.textContent;
+      loaded += page.loaded;
+      moreAvailable = page.moreAvailable;
+      if (!page.loaded || !page.consumed) break;
+    } catch (error) {
+      message(notice, error.message);
+      moreButton.textContent = lastButtonLabel;
+      break;
+    }
+  }
 }
 async function runSearch(query) {
   activeQuery = query.trim();
@@ -327,7 +368,8 @@ async function runSearch(query) {
   message(notice, "");
   providerGrid.replaceChildren(element("div", "loading-card", "Ищем на трёх площадках…"));
   try {
-    await fetchPage(0, false, sequence);
+    const firstPage = await fetchPage(0, false, sequence);
+    if (firstPage) await topUpPage(firstPage, sequence);
   } catch (error) {
     providerGrid.replaceChildren();
     title.textContent = "Поиск не выполнен";
@@ -354,9 +396,8 @@ moreButton.addEventListener("click", async () => {
   moreButton.textContent = "Загружаем…";
   const sequence = searchSequence;
   try {
-    // fetchPage sets the button's next label itself, from real data; it
-    // must be the last word on the label, so nothing here overwrites it.
-    await fetchPage(nextOffset, true, sequence);
+    const firstPage = await fetchPage(nextOffset, true, sequence);
+    if (firstPage) await topUpPage(firstPage, sequence);
   } catch (error) {
     message(notice, error.message);
     moreButton.textContent = labelBeforeClick;
