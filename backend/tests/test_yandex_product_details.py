@@ -98,6 +98,45 @@ class YandexProductDetailsTests(unittest.TestCase):
             {"name": "Материал", "value": "Алюминий"},
         ])
 
+    def test_extracts_value_from_widget_state_and_deduplicates_market_article(self):
+        def widget_state(path):
+            return json.dumps({
+                "widgets": {
+                    "@card/AboutSpecV2": {
+                        path: {
+                            "name": "Артикул Маркета",
+                            "value": "58361534537",
+                            "withCopyValueButton": True,
+                        },
+                    },
+                },
+                "meta": {},
+            }, ensure_ascii=False)
+
+        html = (
+            '<h1 data-auto="productCardTitle">Смартфон Example</h1>'
+            '<span data-auto="snippet-price-current">25 000 ₽</span>'
+            '<div data-zone-name="ProductSpecsList">'
+            + self._product_row(
+                "Артикул Маркета",
+                widget_state("/content/defaultPage/productSpecsList/copyableSpecItem"),
+            )
+            + self._product_row(
+                "Артикул Маркета",
+                widget_state("/content/defaultPage/description/aboutFullSpecsLine_0/copyableSpecItem"),
+            )
+            + "</div>"
+        )
+
+        offer = self.adapter._extract_product(
+            html, "https://market.yandex.ru/card/phone/58361534537"
+        )
+
+        self.assertIsNotNone(offer)
+        self.assertEqual(offer.specifications, [
+            {"name": "Артикул Маркета", "value": "58361534537"},
+        ])
+
 
 if __name__ == "__main__":
     unittest.main()

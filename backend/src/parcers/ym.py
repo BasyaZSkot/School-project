@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from html.parser import HTMLParser
@@ -22,7 +23,7 @@ def _merge_specifications(*groups):
             value = " ".join(str(item.get("value") or "").split())
             if not name or not value:
                 continue
-            identity = (name.casefold(), value.casefold())
+            identity = name.casefold()
             if identity in seen:
                 continue
             merged.append({"name": name[:120], "value": value[:500]})
@@ -30,6 +31,64 @@ def _merge_specifications(*groups):
             if len(merged) >= 30:
                 return merged
     return merged
+
+
+def _find_named_specification_value(value, name, depth=0):
+    if depth > 12:
+        return None
+    if isinstance(value, dict):
+        candidate_name = " ".join(str(value.get("name") or "").split())
+        if candidate_name.casefold() == name.casefold():
+            candidate = value.get("value") or value.get("valueReference")
+            if isinstance(candidate, (str, int, float)) and str(candidate).strip():
+                return str(candidate).strip()
+            if isinstance(candidate, list):
+                values = [str(item).strip() for item in candidate if item is not None]
+                return ", ".join(item for item in values if item) or None
+        for child in value.values():
+            found = _find_named_specification_value(child, name, depth + 1)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_named_specification_value(child, name, depth + 1)
+            if found:
+                return found
+    return None
+
+
+def _is_yandex_widget_state(value, depth=0):
+    if depth > 12:
+        return False
+    if isinstance(value, dict):
+        if any(
+            "widgets" in str(key).casefold()
+            or "copyablespecitem" in str(key).casefold()
+            for key in value
+        ):
+            return True
+        return any(_is_yandex_widget_state(child, depth + 1) for child in value.values())
+    if isinstance(value, list):
+        return any(_is_yandex_widget_state(child, depth + 1) for child in value)
+    return False
+
+
+def _clean_yandex_specification_value(name, raw_value):
+    value = " ".join(str(raw_value or "").split())
+    if not value:
+        return None
+    if value.startswith(("{", "[")):
+        try:
+            payload, _ = json.JSONDecoder().raw_decode(value)
+        except json.JSONDecodeError:
+            payload = None
+        if payload is not None:
+            extracted = _find_named_specification_value(payload, name)
+            if extracted:
+                return " ".join(extracted.split())
+            if _is_yandex_widget_state(payload):
+                return None
+    return value
 
 
 class _YandexProductStateParser(HTMLParser):
@@ -153,14 +212,14 @@ class _YandexProductStateParser(HTMLParser):
 
     def _append_specification(self, name, value):
         name = " ".join(str(name or "").split())
-        value = " ".join(str(value or "").split())
+        value = _clean_yandex_specification_value(name, value)
         if not name or not value:
             return
         if len(name) > 120 or len(value) > 500:
             return
-        identity = (name.casefold(), value.casefold())
+        identity = name.casefold()
         if any(
-            (item["name"].casefold(), item["value"].casefold()) == identity
+            item["name"].casefold() == identity
             for item in self.specifications
         ):
             return
