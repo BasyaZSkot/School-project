@@ -34,6 +34,10 @@
 
 `_MicrodataProductParser` читает Schema.org Microdata из HTML через `itemscope` и `itemprop`. `PublicHtmlSearchAdapter._valid_marketplace_url()` блокирует URL за пределами домена площадки. `_extract()` сначала ищет Product в JSON-LD, затем использует Microdata; для каждого товара проверяет имя, URL и цену. `_extract_product()` выбирает товар, совпадающий с путем открытой страницы; `_fetch_public_page()` получает обычный HTML и проверяет конечный адрес редиректа; `parse_product()` разбирает публичную страницу карточки; `search()` строит ссылку поиска и разбирает первую страницу.
 
+### `ym.py` — адаптер Яндекс Маркета
+
+`_YandexProductStateParser` читает публичные `data-auto` поля страницы товара. Кроме заголовка и цены, он собирает пары из `span[data-auto="product-spec"]` и соседнего блока значения, удаляет повторы и ограничивает список 30 характеристиками. `YandexMarketAdapter._extract_product()` объединяет эти данные с доступными полями Schema.org; API карточки передаёт список в окно «Подробнее».
+
 ### `embedded_state.py` — JSON, уже встроенный в HTML
 
 `_StateScriptParser` собирает текст скриптов, но не исполняет JavaScript. `_json_value_at()` находит конец JSON-объекта или массива с учётом кавычек и экранирования. `embedded_json_documents()` декодирует JSON-скрипты и распространённые JSON-присваивания состояния страницы, удаляя повторные документы. `_nodes()` обходит вложенные словари, массивы и JSON-строки с ограничением глубины.

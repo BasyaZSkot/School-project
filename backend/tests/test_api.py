@@ -86,6 +86,7 @@ class MarketplaceApiTests(unittest.TestCase):
         self.assertEqual(payload["description"], "Беспроводные наушники.")
         self.assertEqual(payload["rating"], 4.7)
         self.assertEqual(payload["review_count"], 123)
+        self.assertEqual(payload["specifications"], [{"name": "Цвет", "value": "Чёрный"}])
         mocked.assert_awaited_once_with("Ozon", offer.url)
 
     def test_product_details_rejects_other_hosts(self):

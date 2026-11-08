@@ -11,12 +11,38 @@ from .public_html import PublicHtmlSearchAdapter, _price_from_offer
 MAX_SEARCH_PAGES = 50
 
 
+def _merge_specifications(*groups):
+    merged = []
+    seen = set()
+    for group in groups:
+        for item in group or []:
+            if not isinstance(item, dict):
+                continue
+            name = " ".join(str(item.get("name") or "").split())
+            value = " ".join(str(item.get("value") or "").split())
+            if not name or not value:
+                continue
+            identity = (name.casefold(), value.casefold())
+            if identity in seen:
+                continue
+            merged.append({"name": name[:120], "value": value[:500]})
+            seen.add(identity)
+            if len(merged) >= 30:
+                return merged
+    return merged
+
+
 class _YandexProductStateParser(HTMLParser):
     # Read public data-auto fields used by Grex's Yandex product parser.
     _targets = {
         "productCardTitle",
         "snippet-price-old",
         "snippet-price-current",
+        "product-spec",
+    }
+    _void_tags = {
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
     }
 
     def __init__(self):
@@ -24,22 +50,61 @@ class _YandexProductStateParser(HTMLParser):
         self._tags = []
         self._captures = []
         self.values = {}
+        self.specifications = []
+        self._spec_row = None
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
-        self._tags.append(tag)
-        target = dict(attrs).get("data-auto")
+        attrs = dict(attrs)
+        depth = len(self._tags) + 1
+        target = attrs.get("data-auto")
+
+        # In the public product markup the value is the second direct child of
+        # the row three levels above span[data-auto="product-spec"].
+        if (
+            self._spec_row is not None
+            and self._spec_row["phase"] == "waiting_value"
+            and len(self._tags) == self._spec_row["row_depth"]
+        ):
+            self._spec_row["phase"] = "value"
+            self._spec_row["value_tag"] = tag
+            self._spec_row["value_depth"] = depth
+            self._spec_row["value_parts"] = []
+
         if target in self._targets:
-            self._captures.append({
+            capture = {
                 "tag": tag,
-                "depth": len(self._tags),
+                "depth": depth,
                 "target": target,
                 "parts": [],
-            })
+            }
+            self._captures.append(capture)
+            if target == "product-spec" and len(self._tags) >= 3:
+                row_depth = len(self._tags) - 2
+                self._spec_row = {
+                    "row_depth": row_depth,
+                    "row_tag": self._tags[row_depth - 1],
+                    "label_child_tag": self._tags[row_depth],
+                    "phase": "label",
+                    "name": None,
+                }
+
+        if tag not in self._void_tags:
+            self._tags.append(tag)
+
+    def handle_startendtag(self, tag, attrs):
+        tag = tag.lower()
+        if tag in self._void_tags:
+            self.handle_starttag(tag, attrs)
+            return
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
 
     def handle_data(self, data):
         for capture in self._captures:
             capture["parts"].append(data)
+        if self._spec_row is not None and self._spec_row["phase"] == "value":
+            self._spec_row["value_parts"].append(data)
 
     def handle_endtag(self, tag):
         tag = tag.lower()
@@ -56,11 +121,51 @@ class _YandexProductStateParser(HTMLParser):
             if capture["tag"] == tag and capture["depth"] == depth:
                 value = " ".join(" ".join(capture["parts"]).split())
                 if value:
-                    self.values.setdefault(capture["target"], []).append(value)
+                    if capture["target"] == "product-spec" and self._spec_row is not None:
+                        self._spec_row["name"] = value
+                    else:
+                        self.values.setdefault(capture["target"], []).append(value)
             else:
                 remaining.append(capture)
         self._captures = remaining
+
+        row = self._spec_row
+        if row is not None:
+            if (
+                row["phase"] == "label"
+                and depth == row["row_depth"] + 1
+                and tag == row["label_child_tag"]
+            ):
+                row["phase"] = "waiting_value"
+            elif (
+                row["phase"] == "value"
+                and depth == row["value_depth"]
+                and tag == row["value_tag"]
+            ):
+                self._append_specification(
+                    row.get("name"), " ".join(" ".join(row["value_parts"]).split())
+                )
+                self._spec_row = None
+            elif depth == row["row_depth"] and tag == row["row_tag"]:
+                self._spec_row = None
+
         del self._tags[close_index:]
+
+    def _append_specification(self, name, value):
+        name = " ".join(str(name or "").split())
+        value = " ".join(str(value or "").split())
+        if not name or not value:
+            return
+        if len(name) > 120 or len(value) > 500:
+            return
+        identity = (name.casefold(), value.casefold())
+        if any(
+            (item["name"].casefold(), item["value"].casefold()) == identity
+            for item in self.specifications
+        ):
+            return
+        if len(self.specifications) < 30:
+            self.specifications.append({"name": name, "value": value})
 
 
 class _YandexSearchCardsParser(HTMLParser):
@@ -323,6 +428,10 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             if price is not None:
                 break
         structured = super()._extract_product(html, page_url)
+        if structured is not None:
+            structured.specifications = _merge_specifications(
+                parser.specifications, structured.specifications
+            )
         if not title or price is None:
             return structured
         product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
@@ -341,6 +450,8 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             offer.specifications = structured.specifications
             offer.reviews = structured.reviews
             offer.image_url = structured.image_url
+        else:
+            offer.specifications = parser.specifications
         return offer
 
     @classmethod
