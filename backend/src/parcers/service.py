@@ -77,6 +77,7 @@ class MarketplaceSearchService:
         # the last good prefix prevents that failure from erasing the result set.
         offers_by_marketplace: dict[str, list[Offer]] = {}
         more_by_marketplace: dict[str, bool] = {}
+        product_order: list[str] = []
         now = time.monotonic()
         for key, saved in list(self._search_sessions.items()):
             if now - saved["updated_at"] > SEARCH_SESSION_TTL_SECONDS:
@@ -88,6 +89,7 @@ class MarketplaceSearchService:
                     name: list(items) for name, items in saved["offers"].items()
                 }
                 more_by_marketplace = dict(saved["has_more"])
+                product_order = list(saved.get("product_order", []))
 
         # Fetch enough records from each provider to assemble the requested
         # global page after cross-marketplace grouping and deduplication.
@@ -184,6 +186,7 @@ class MarketplaceSearchService:
                 "query": query,
                 "offers": offers_by_marketplace,
                 "has_more": more_by_marketplace,
+                "product_order": product_order,
                 "updated_at": time.monotonic(),
             }
             if len(self._search_sessions) > MAX_SEARCH_SESSIONS:
@@ -239,7 +242,26 @@ class MarketplaceSearchService:
                         "reviews": item.reviews,
                     } for item in product_offers],
                 })
-        products.sort(key=lambda item: normalize_title(item["title"]))
+        if session_id:
+            # New provider prefixes can discover products that sort before
+            # already displayed cards. Keep the first-seen order for this
+            # search session so offset-based pages never repeat or skip cards.
+            session = self._search_sessions[session_id]
+            products_by_id = {item["product_id"]: item for item in products}
+            ordered_ids = [
+                product_id for product_id in session["product_order"]
+                if product_id in products_by_id
+            ]
+            known_ids = set(ordered_ids)
+            new_products = sorted(
+                (item for item in products if item["product_id"] not in known_ids),
+                key=lambda item: normalize_title(item["title"]),
+            )
+            ordered_ids.extend(item["product_id"] for item in new_products)
+            session["product_order"] = ordered_ids
+            products = [products_by_id[product_id] for product_id in ordered_ids]
+        else:
+            products.sort(key=lambda item: normalize_title(item["title"]))
         total_products = len(products)
         page_products = products[offset:offset + limit]
         # Grouping merges offers, so the product count alone can drop below a
