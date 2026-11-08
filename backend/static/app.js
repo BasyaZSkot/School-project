@@ -331,8 +331,7 @@ async function topUpPage(firstPage, sequence) {
   let moreAvailable = Boolean(firstPage?.moreAvailable);
   let retryDelay = INITIAL_PAGE_FILL_RETRY_MS;
   while (
-    loaded > 0
-    && loaded < DEFAULT_PAGE_SIZE
+    loaded < DEFAULT_PAGE_SIZE
     && moreAvailable
     && sequence === searchSequence
   ) {
