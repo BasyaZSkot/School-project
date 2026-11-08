@@ -19,7 +19,8 @@ let searchSequence = 0;
 let detailRequestSequence = 0;
 const loadedProductIds = new Set();
 const DEFAULT_PAGE_SIZE = 20;
-const MAX_PAGE_FILL_REQUESTS = 3;
+const INITIAL_PAGE_FILL_RETRY_MS = 1000;
+const MAX_PAGE_FILL_RETRY_MS = 10000;
 const productDialog = document.querySelector("#product-dialog");
 
 const providerMeta = {
@@ -328,28 +329,36 @@ async function fetchPage(offset, append, sequence = searchSequence, displayLimit
 async function topUpPage(firstPage, sequence) {
   let loaded = firstPage?.loaded || 0;
   let moreAvailable = Boolean(firstPage?.moreAvailable);
-  let requests = 1;
-  let lastButtonLabel = moreButton.textContent;
+  let retryDelay = INITIAL_PAGE_FILL_RETRY_MS;
   while (
     loaded > 0
     && loaded < DEFAULT_PAGE_SIZE
     && moreAvailable
-    && requests < MAX_PAGE_FILL_REQUESTS
+    && sequence === searchSequence
   ) {
-    moreButton.textContent = "Загружаем…";
+    moreButton.textContent = "Жду товары…";
+    message(notice, `Добавлено ${loaded} из ${DEFAULT_PAGE_SIZE}. Жду следующие карточки…`);
+    await new Promise(resolve => setTimeout(resolve, retryDelay));
+    if (sequence !== searchSequence) break;
+
     try {
+      moreButton.textContent = "Загружаем…";
       const page = await fetchPage(nextOffset, true, sequence, DEFAULT_PAGE_SIZE - loaded);
       if (!page) break;
-      requests += 1;
-      lastButtonLabel = moreButton.textContent;
-      loaded += page.loaded;
       moreAvailable = page.moreAvailable;
-      if (!page.loaded || !page.consumed) break;
+      if (page.loaded > 0) {
+        loaded += page.loaded;
+        retryDelay = INITIAL_PAGE_FILL_RETRY_MS;
+      } else {
+        retryDelay = Math.min(retryDelay * 2, MAX_PAGE_FILL_RETRY_MS);
+      }
     } catch (error) {
-      message(notice, error.message);
-      moreButton.textContent = lastButtonLabel;
-      break;
+      message(notice, `Добавлено ${loaded} из ${DEFAULT_PAGE_SIZE}. ${error.message} Повторяю запрос…`);
+      retryDelay = Math.min(retryDelay * 2, MAX_PAGE_FILL_RETRY_MS);
     }
+  }
+  if (sequence === searchSequence && loaded > 0 && loaded < DEFAULT_PAGE_SIZE && !moreAvailable) {
+    message(notice, `Площадки вернули ${loaded} из ${DEFAULT_PAGE_SIZE} доступных карточек.`);
   }
 }
 async function runSearch(query) {
