@@ -11,16 +11,15 @@ const offersList = document.querySelector("#offers-list");
 const offersCaption = document.querySelector("#offers-caption");
 const moreButton = document.querySelector("#load-more-button");
 let activeQuery = "";
-let activeSearchId = "";
-let nextOffset = 0;
+let bufferedProducts = [];
+let displayedProductCount = 0;
 let productCount = 0;
 let offerCount = 0;
 let searchSequence = 0;
 let detailRequestSequence = 0;
 const loadedProductIds = new Set();
-const DEFAULT_PAGE_SIZE = 20;
-const INITIAL_PAGE_FILL_RETRY_MS = 1000;
-const MAX_PAGE_FILL_RETRY_MS = 10000;
+const MAX_BUFFERED_RESULTS = 200;
+const DISPLAY_BATCH_SIZE = 20;
 const productDialog = document.querySelector("#product-dialog");
 
 const providerMeta = {
@@ -30,6 +29,7 @@ const providerMeta = {
 };
 const statusMeta = {
   access_required: { label: "Нужен источник", className: "status-warn" },
+  disabled: { label: "Временно выключен", className: "status-neutral" },
   policy_restricted: { label: "Доступ ограничен", className: "status-warn" },
   ready: { label: "Есть карточки", className: "status-good" },
   no_results: { label: "Нет карточек", className: "status-warn" },
@@ -52,12 +52,6 @@ function productsWord(n) {
   if (mod10 === 1 && mod100 !== 11) return "товар";
   if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "товара";
   return "товаров";
-}
-function newSearchSessionId() {
-  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
-    return globalThis.crypto.randomUUID();
-  }
-  return "search-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 function money(value, currency) {
   return new Intl.NumberFormat("ru-RU", {
@@ -275,96 +269,66 @@ async function openProductDetails(offer) {
 
 document.querySelector("#detail-close").addEventListener("click", () => productDialog.close());
 
-async function fetchPage(offset, append, sequence = searchSequence, displayLimit = DEFAULT_PAGE_SIZE) {
-  const query = activeQuery;
+function updateMoreButton() {
+  const remaining = Math.max(0, bufferedProducts.length - displayedProductCount);
+  moreButton.hidden = remaining === 0;
+  if (remaining > 0) {
+    const nextBatch = Math.min(DISPLAY_BATCH_SIZE, remaining);
+    moreButton.textContent = "Показать ещё " + nextBatch + " " + productsWord(nextBatch);
+  }
+}
+function revealNextProducts() {
+  const start = displayedProductCount;
+  const end = Math.min(start + DISPLAY_BATCH_SIZE, bufferedProducts.length);
+  if (end <= start) {
+    updateMoreButton();
+    return 0;
+  }
+  const batch = bufferedProducts.slice(start, end);
+  const rendered = renderOffers(batch, activeQuery, start > 0);
+  displayedProductCount = end;
+  updateMoreButton();
+  return rendered;
+}
+async function fetchSearchResults(sequence = searchSequence) {
   const params = new URLSearchParams({
-    q: query, limit: "20", offset: String(offset), session_id: activeSearchId
+    q: activeQuery,
+    limit: String(MAX_BUFFERED_RESULTS),
+    offset: "0"
   });
-  const response = await fetch("/api/search?" + params, { headers: { Accept: "application/json" } });
+  const response = await fetch("/api/search?" + params, {
+    headers: { Accept: "application/json" }
+  });
   const data = await response.json();
   if (sequence !== searchSequence) return null;
   if (!response.ok) throw new Error(data.detail || "Не удалось выполнить поиск.");
-  const responseProducts = data.products || [];
-  const pageProducts = responseProducts.slice(0, displayLimit);
-  let renderedCount = 0;
-  if (!append) {
-    title.textContent = "Результаты для «" + data.query + "»";
-    renderProviders(data.providers);
-    renderedCount = renderOffers(pageProducts, activeQuery, false);
-    emptyState.hidden = Boolean(responseProducts.length);
-    if (!responseProducts.length) {
-      emptyState.querySelector("strong").textContent = "Товары не найдены";
-      emptyState.querySelector("span").textContent = "Открой площадку или подключи разрешённый источник данных.";
-    }
-    message(notice, data.notice);
-  } else {
-    renderedCount = renderOffers(pageProducts, activeQuery, true);
-  }
-  // Advance by consumed results, even if the browser skipped a duplicate card.
-  nextOffset = data.offset + pageProducts.length;
-  const hasBufferedProducts = responseProducts.length > pageProducts.length;
-  const retryableEmptyPage = data.retryable && !responseProducts.length;
-  moreButton.hidden = retryableEmptyPage
-    ? false
-    : (!pageProducts.length || (!hasBufferedProducts && !data.has_more));
-  if (append) {
-    message(notice, data.retryable
-      ? "Источник временно не ответил. Найденные товары сохранены — нажмите кнопку ещё раз, чтобы повторить загрузку."
-      : "");
-  }
-  // total_products only reflects every product that exists once every
-  // provider has run dry; otherwise the backend only probed one item past
-  // the current page, so DEFAULT_PAGE_SIZE is the only honest guess.
-  const remaining = data.exact_total ? Math.max(0, (data.total_products ?? 0) - nextOffset) : 0;
-  const nextBatch = remaining > 0 ? Math.min(DEFAULT_PAGE_SIZE, remaining) : DEFAULT_PAGE_SIZE;
-  moreButton.textContent = data.retryable
-    ? "Повторить загрузку"
-    : `Показать ещё ${nextBatch} ${productsWord(nextBatch)}`;
-  return {
-    loaded: renderedCount,
-    consumed: pageProducts.length,
-    moreAvailable: !moreButton.hidden
-  };
-}
-async function topUpPage(firstPage, sequence) {
-  let loaded = firstPage?.loaded || 0;
-  let moreAvailable = Boolean(firstPage?.moreAvailable);
-  let retryDelay = INITIAL_PAGE_FILL_RETRY_MS;
-  while (
-    loaded < DEFAULT_PAGE_SIZE
-    && moreAvailable
-    && sequence === searchSequence
-  ) {
-    moreButton.textContent = "Жду товары…";
-    message(notice, `Добавлено ${loaded} из ${DEFAULT_PAGE_SIZE}. Жду следующие карточки…`);
-    await new Promise(resolve => setTimeout(resolve, retryDelay));
-    if (sequence !== searchSequence) break;
 
-    try {
-      moreButton.textContent = "Загружаем…";
-      const page = await fetchPage(nextOffset, true, sequence, DEFAULT_PAGE_SIZE - loaded);
-      if (!page) break;
-      moreAvailable = page.moreAvailable;
-      if (page.loaded > 0) {
-        loaded += page.loaded;
-        retryDelay = INITIAL_PAGE_FILL_RETRY_MS;
-      } else {
-        retryDelay = Math.min(retryDelay * 2, MAX_PAGE_FILL_RETRY_MS);
-      }
-    } catch (error) {
-      message(notice, `Добавлено ${loaded} из ${DEFAULT_PAGE_SIZE}. ${error.message} Повторяю запрос…`);
-      retryDelay = Math.min(retryDelay * 2, MAX_PAGE_FILL_RETRY_MS);
-    }
+  bufferedProducts = Array.isArray(data.products) ? data.products : [];
+  displayedProductCount = 0;
+  title.textContent = "Результаты для «" + data.query + "»";
+  renderProviders(data.providers);
+  const firstBatch = bufferedProducts.slice(0, DISPLAY_BATCH_SIZE);
+  renderOffers(firstBatch, activeQuery, false);
+  displayedProductCount = firstBatch.length;
+  emptyState.hidden = Boolean(bufferedProducts.length);
+  if (!bufferedProducts.length) {
+    emptyState.querySelector("strong").textContent = "Товары не найдены";
+    emptyState.querySelector("span").textContent = "Открой площадку или подключи разрешённый источник данных.";
   }
-  if (sequence === searchSequence && loaded > 0 && loaded < DEFAULT_PAGE_SIZE && !moreAvailable) {
-    message(notice, `Площадки вернули ${loaded} из ${DEFAULT_PAGE_SIZE} доступных карточек.`);
+
+  if ((data.total_products ?? 0) >= MAX_BUFFERED_RESULTS && !data.exact_total) {
+    message(notice, "Яндекс Маркет вернул первые 200 доступных карточек. Возможно, у запроса есть следующие страницы.");
+  } else {
+    message(notice, data.notice);
   }
+  updateMoreButton();
+  return data;
 }
 async function runSearch(query) {
   activeQuery = query.trim();
   if (!activeQuery) return;
-  activeSearchId = newSearchSessionId();
-  nextOffset = 0;
+  bufferedProducts = [];
+  displayedProductCount = 0;
   const sequence = ++searchSequence;
   input.value = activeQuery;
   button.disabled = true;
@@ -374,10 +338,9 @@ async function runSearch(query) {
   offersWrap.hidden = true;
   moreButton.hidden = true;
   message(notice, "");
-  providerGrid.replaceChildren(element("div", "loading-card", "Ищем на трёх площадках…"));
+  providerGrid.replaceChildren(element("div", "loading-card", "Ищем до 200 товаров на Яндекс Маркете…"));
   try {
-    const firstPage = await fetchPage(0, false, sequence);
-    if (firstPage) await topUpPage(firstPage, sequence);
+    await fetchSearchResults(sequence);
   } catch (error) {
     providerGrid.replaceChildren();
     title.textContent = "Поиск не выполнен";
@@ -398,18 +361,10 @@ form.addEventListener("submit", event => {
 document.querySelectorAll(".example-query").forEach(item =>
   item.addEventListener("click", () => runSearch(item.textContent))
 );
-moreButton.addEventListener("click", async () => {
+moreButton.addEventListener("click", () => {
+  if (moreButton.hidden) return;
   moreButton.disabled = true;
-  const labelBeforeClick = moreButton.textContent;
-  moreButton.textContent = "Загружаем…";
-  const sequence = searchSequence;
-  try {
-    const firstPage = await fetchPage(nextOffset, true, sequence);
-    if (firstPage) await topUpPage(firstPage, sequence);
-  } catch (error) {
-    message(notice, error.message);
-    moreButton.textContent = labelBeforeClick;
-  } finally {
-    moreButton.disabled = false;
-  }
+  moreButton.textContent = "Показываем…";
+  revealNextProducts();
+  moreButton.disabled = false;
 });

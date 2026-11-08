@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from collections import defaultdict
 
 import httpx
 
-from .base import MAX_PROVIDER_LIMIT, Offer, SearchAdapter, normalize_title, offer_group_key
+from .base import (
+    MAX_PROVIDER_LIMIT,
+    DisabledAdapter,
+    Offer,
+    SearchAdapter,
+    SearchStatus,
+    normalize_title,
+    offer_group_key,
+)
 from .ozon import OzonAdapter
 from .transport import BlockedError
 from .wb import WildberriesAdapter
@@ -19,17 +28,67 @@ from .ym import YandexMarketAdapter
 # request, bounded by its own page loop, so this cap is a safety ceiling on
 # top of that, not a multiplier on network calls.
 PROVIDER_FETCH_CAP = MAX_PROVIDER_LIMIT
+DEFAULT_SEARCH_MARKETPLACES = frozenset({"Яндекс Маркет"})
 SEARCH_SESSION_TTL_SECONDS = 600
 MAX_SEARCH_SESSIONS = 100
 
 
 class MarketplaceSearchService:
-    def __init__(self, adapters: list[SearchAdapter] | None = None, provider_timeout: float = 25.0):
+    def __init__(
+        self,
+        adapters: list[SearchAdapter] | None = None,
+        provider_timeout: float = 120.0,
+        enabled_search_marketplaces: set[str] | list[str] | tuple[str, ...] | str | None = None,
+    ):
+        using_default_adapters = adapters is None
         self.adapters = adapters if adapters is not None else [
             OzonAdapter.from_env(),
             WildberriesAdapter.from_env(),
             YandexMarketAdapter.from_env(),
         ]
+
+        configured_marketplaces = enabled_search_marketplaces
+        if configured_marketplaces is None and using_default_adapters:
+            configured_marketplaces = os.getenv("MULTIMARKET_SEARCH_MARKETPLACES")
+        if configured_marketplaces is None:
+            enabled = (
+                set(DEFAULT_SEARCH_MARKETPLACES)
+                if using_default_adapters
+                else {adapter.marketplace for adapter in self.adapters}
+            )
+        elif isinstance(configured_marketplaces, str):
+            enabled = {
+                name.strip()
+                for name in configured_marketplaces.split(",")
+                if name.strip()
+            }
+        else:
+            enabled = {str(name).strip() for name in configured_marketplaces if str(name).strip()}
+
+        known_marketplaces = {adapter.marketplace for adapter in self.adapters}
+        unknown = enabled - known_marketplaces
+        if unknown:
+            names = ", ".join(sorted(unknown))
+            raise ValueError(f"Unknown search marketplace(s): {names}")
+
+        self.enabled_search_marketplaces = frozenset(enabled)
+        self.search_adapters: list[SearchAdapter] = []
+        for adapter in self.adapters:
+            if adapter.marketplace in self.enabled_search_marketplaces:
+                self.search_adapters.append(adapter)
+                continue
+            search_url = (
+                getattr(adapter, "base_search_url", None)
+                or getattr(adapter, "search_url", None)
+                or "https://example.org/search?q={query}"
+            )
+            self.search_adapters.append(DisabledAdapter(
+                marketplace=adapter.marketplace,
+                reason="Поиск на площадке временно отключён.",
+                status=SearchStatus.DISABLED,
+                base_search_url=search_url,
+            ))
+
         self.provider_timeout = provider_timeout
         self._search_sessions: dict[str, dict] = {}
 
@@ -66,8 +125,8 @@ class MarketplaceSearchService:
         query = query.strip()
         if not query:
             raise ValueError("Search query must not be empty")
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+        if not 1 <= limit <= PROVIDER_FETCH_CAP:
+            raise ValueError(f"limit must be between 1 and {PROVIDER_FETCH_CAP}")
         max_offset = PROVIDER_FETCH_CAP * 3
         if not 0 <= offset <= max_offset:
             raise ValueError(f"offset must be between 0 and {max_offset}")
@@ -95,14 +154,14 @@ class MarketplaceSearchService:
         # global page after cross-marketplace grouping and deduplication.
         provider_limit = min(PROVIDER_FETCH_CAP, offset + limit + 1)
         results = await asyncio.gather(
-            *(self._search_one(adapter, query, provider_limit) for adapter in self.adapters),
+            *(self._search_one(adapter, query, provider_limit) for adapter in self.search_adapters),
             return_exceptions=True,
         )
         provider_results = []
         provider_may_have_more = False
         offers: list[Offer] = []
         seen: set[tuple[str, str]] = set()
-        for adapter, result in zip(self.adapters, results):
+        for adapter, result in zip(self.search_adapters, results):
             if isinstance(result, Exception):
                 error_name = "timeout" if isinstance(result, asyncio.TimeoutError) else type(result).__name__
                 search_url = ""
@@ -178,7 +237,7 @@ class MarketplaceSearchService:
         if session_id:
             offers = [
                 offer
-                for adapter in self.adapters
+                for adapter in self.search_adapters
                 for offer in offers_by_marketplace.get(adapter.marketplace, [])
             ]
             provider_may_have_more = any(more_by_marketplace.values())

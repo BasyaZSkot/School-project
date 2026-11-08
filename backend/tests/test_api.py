@@ -43,6 +43,16 @@ class MarketplaceApiTests(unittest.TestCase):
         self.assertTrue(all(provider["search_url"].startswith("https://") for provider in payload["providers"]))
         mocked.assert_awaited_once_with("кофемашина", 20, 0)
 
+    def test_search_accepts_limit_of_two_hundred(self):
+        expected = {"query": "phone", "providers": [], "products": [], "has_more": False}
+        with patch("src.parcers.api.search_service.search", new_callable=AsyncMock) as mocked:
+            mocked.return_value = expected
+            response = self.client.get("/api/search", params={"q": "phone", "limit": 200})
+
+        self.assertEqual(response.status_code, 200)
+        mocked.assert_awaited_once_with("phone", 200, 0)
+
+
     def test_search_passes_session_id_for_stable_pagination(self):
         expected = {"query": "phone", "providers": [], "products": [], "has_more": False}
         with patch("src.parcers.api.search_service.search", new_callable=AsyncMock) as mocked:

@@ -101,6 +101,28 @@ class YandexSearchPaginationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("page=8", requested[-1])
         self.assertEqual(result.status.value, "ready")
 
+    async def test_collects_up_to_two_hundred_products_from_public_pages(self):
+        adapter = YandexMarketAdapter(
+            marketplace="Яндекс Маркет",
+            search_url="https://market.yandex.ru/search?text={query}",
+            allowed_hosts=("market.yandex.ru",),
+        )
+        requested = []
+
+        async def fetch(url):
+            requested.append(url)
+            page = int(parse_qs(urlparse(url).query).get("page", ["1"])[0])
+            return url, page_html(page)
+
+        adapter._fetch_public_page = fetch
+        result = await adapter.search("телефон", limit=200)
+
+        self.assertEqual(len(result.offers), 200)
+        self.assertEqual(len({offer.url for offer in result.offers}), 200)
+        self.assertEqual(len(requested), 25)
+        self.assertIn("page=25", requested[-1])
+
+
     async def test_fetches_public_search_pages_until_twenty_products(self):
         adapter = YandexMarketAdapter(
             marketplace="Яндекс Маркет",

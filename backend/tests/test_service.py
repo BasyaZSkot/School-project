@@ -1,5 +1,6 @@
 import asyncio
 import unittest
+from unittest.mock import patch
 
 import httpx
 
@@ -37,6 +38,48 @@ def make_offer(marketplace, title, price, currency="RUB", gtin="4601234567890", 
         external_id=item_id,
         gtin=gtin,
     )
+
+
+class SearchMarketplaceSelectionTests(unittest.IsolatedAsyncioTestCase):
+    def test_default_configuration_searches_only_yandex(self):
+        with patch("src.parcers.service.os.getenv", side_effect=lambda _name, default=None: default):
+            service = MarketplaceSearchService()
+
+        self.assertEqual(service.enabled_search_marketplaces, {"Яндекс Маркет"})
+        self.assertEqual(
+            [adapter.marketplace for adapter in service.search_adapters],
+            ["Ozon", "Wildberries", "Яндекс Маркет"],
+        )
+        self.assertEqual(service.search_adapters[0].status.value, "disabled")
+        self.assertEqual(service.search_adapters[1].status.value, "disabled")
+
+    async def test_disabled_marketplaces_are_reported_without_network_searches(self):
+        class CountingAdapter(FakeAdapter):
+            def __init__(self, marketplace, offers=None):
+                super().__init__(marketplace, offers)
+                self.search_calls = 0
+
+            async def search(self, query, limit=20):
+                self.search_calls += 1
+                return await super().search(query, limit)
+
+        ozon = CountingAdapter("Ozon", [make_offer("Ozon", "Ozon item", 100, item_id="oz")])
+        wb = CountingAdapter("Wildberries", [make_offer("Wildberries", "WB item", 110, item_id="wb")])
+        yandex = CountingAdapter("Яндекс Маркет", [make_offer("Яндекс Маркет", "Yandex item", 90, item_id="ym")])
+        service = MarketplaceSearchService(
+            adapters=[ozon, wb, yandex],
+            enabled_search_marketplaces={"Яндекс Маркет"},
+        )
+
+        result = await service.search("item")
+        providers = {provider["marketplace"]: provider for provider in result["providers"]}
+
+        self.assertEqual((ozon.search_calls, wb.search_calls, yandex.search_calls), (0, 0, 1))
+        self.assertEqual(providers["Ozon"]["status"], "disabled")
+        self.assertEqual(providers["Wildberries"]["status"], "disabled")
+        self.assertEqual(providers["Яндекс Маркет"]["status"], "ready")
+        self.assertEqual(len(result["products"]), 1)
+        self.assertIn("https://example.org/search", providers["Ozon"]["search_url"])
 
 
 class MarketplaceSearchServiceTests(unittest.IsolatedAsyncioTestCase):

@@ -15,6 +15,7 @@ MAX_PROVIDER_LIMIT = 200
 class SearchStatus(str, Enum):
     READY = "ready"
     NO_RESULTS = "no_results"
+    DISABLED = "disabled"
     ACCESS_REQUIRED = "access_required"
     POLICY_RESTRICTED = "policy_restricted"
     ERROR = "error"
@@ -86,6 +87,18 @@ class DisabledAdapter:
     reason: str
     status: SearchStatus = SearchStatus.ACCESS_REQUIRED
     base_search_url: str
+
+    def __init__(
+        self,
+        marketplace: str,
+        reason: str,
+        base_search_url: str,
+        status: SearchStatus = SearchStatus.ACCESS_REQUIRED,
+    ):
+        self.marketplace = marketplace
+        self.reason = reason
+        self.base_search_url = base_search_url
+        self.status = status
 
     def build_search_url(self, query: str) -> str:
         return self.base_search_url.format(query=quote_plus(query))

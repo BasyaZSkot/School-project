@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -70,11 +70,18 @@ class MonitoringApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 422)
 
     def test_batch_search_accepts_multiple_queries(self):
-        response = self.client.post("/api/search/batch", json={
-            "queries": ["coffee machine", "wireless headphones"],
-            "limit": 5,
-        })
+        with patch("src.parcers.api.search_service.search", new_callable=AsyncMock) as search:
+            search.side_effect = [
+                {"query": "coffee machine"},
+                {"query": "wireless headphones"},
+            ]
+            response = self.client.post("/api/search/batch", json={
+                "queries": ["coffee machine", "wireless headphones"],
+                "limit": 5,
+            })
+
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(search.await_count, 2)
         self.assertEqual(
             [item["query"] for item in response.json()["results"]],
             ["coffee machine", "wireless headphones"],

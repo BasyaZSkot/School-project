@@ -31,6 +31,19 @@ class FakeAdapter:
         )
 
 
+class SingleResponseLimitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_service_returns_up_to_two_hundred_products_in_one_response(self):
+        adapter = MergingAdapter("Яндекс Маркет")
+        adapter.supply = 500
+        service = MarketplaceSearchService(adapters=[adapter])
+
+        result = await service.search("phone", limit=200)
+
+        self.assertEqual(result["limit"], 200)
+        self.assertEqual(len(result["products"]), 200)
+        self.assertEqual(result["products"][0]["offers"][0]["marketplace"], "Яндекс Маркет")
+
+
 class SearchPaginationTests(unittest.TestCase):
     def test_returns_twenty_products_then_next_page_without_overlap(self):
         service = MarketplaceSearchService(

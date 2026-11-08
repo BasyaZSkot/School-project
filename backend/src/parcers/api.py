@@ -96,7 +96,7 @@ async def health():
 @app.get("/api/search")
 async def search(
     q: str = Query(min_length=1, max_length=160, description="Название товара"),
-    limit: int = Query(default=20, ge=1, le=50),
+    limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=PROVIDER_FETCH_CAP * 3),
     session_id: str | None = Query(default=None, min_length=8, max_length=80),
 ):
