@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>Мониторинг — MultiMarket</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/monitoring.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a class="active" href="/monitoring">Мониторинг</a>
+      <a href="/history">История цен</a><a href="/sources">Источники</a>
+    </nav>
+    <a class="top-action" href="/">Найти товар</a>
+  </header>
+  <main class="page">
+    <section class="page-intro page-intro-compact">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> МОИ ТОВАРЫ</div>
+      <h1>Мониторинг цен</h1>
+      <p>Следи за изменением цены и переходи к истории каждого товара.</p>
+    </section>
+    <div class="section-toolbar">
+      <div><h2>Отслеживаемые товары</h2><p class="muted">Добавляй товары кнопкой «Следить за ценой» на странице поиска.</p></div>
+      <div class="toolbar-actions"><a class="button button-secondary" href="/api/monitors/export.csv">Экспорт CSV</a><button class="button button-primary" id="refresh-monitors" type="button">Обновить</button></div>
+    </div>
+    <div id="page-message" class="notice" hidden><span class="notice-icon">i</span><p></p></div>
+    <div id="monitor-list" class="monitor-list"><div class="loading-card">Загружаем товары…</div></div>
+  </main>
+  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
+</body>
+</html>
