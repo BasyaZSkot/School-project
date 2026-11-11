@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>История цен — MultiMarket</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/history.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
+      <a class="active" href="/history">История цен</a><a href="/sources">Источники</a>
+    </nav>
+    <a class="top-action" href="/monitoring">Мои товары</a>
+  </header>
+  <main class="page">
+    <section class="page-intro page-intro-compact">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> ДИНАМИКА</div>
+      <h1>История цен</h1>
+      <p>Сохранённые проверки и изменения цены по товарам, за которыми ты следишь.</p>
+    </section>
+    <div class="section-toolbar">
+      <div><h2 id="history-title">Все товары</h2><p class="muted">Новые точки появятся после успешной проверки источника.</p></div>
+      <button class="button button-secondary" id="refresh-history" type="button">Обновить</button>
+    </div>
+    <div id="page-message" class="notice" hidden><span class="notice-icon">i</span><p></p></div>
+    <div id="history-list" class="history-list"><div class="loading-card">Загружаем историю…</div></div>
+  </main>
+  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
+</body>
+</html>
