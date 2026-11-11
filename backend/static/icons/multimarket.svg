@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64" fill="none">
+  <title>MultiMarket</title>
+  <defs>
+    <linearGradient id="brand" x1="6" y1="2" x2="58" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7970F4"/>
+      <stop offset="1" stop-color="#5148CD"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#brand)"/>
+  <path d="M24 24V21a8 8 0 0 1 16 0v3" stroke="#FFF" stroke-width="4" stroke-linecap="round"/>
+  <path d="M19 23h26a4 4 0 0 1 4 4v20a5 5 0 0 1-5 5H20a5 5 0 0 1-5-5V27a4 4 0 0 1 4-4Z" fill="#FFF"/>
+  <path d="M24 43V33l8 8 8-8v10" stroke="#5A52DC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

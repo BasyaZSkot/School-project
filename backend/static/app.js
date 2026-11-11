@@ -10,6 +10,8 @@ const offersWrap = document.querySelector("#offers-wrap");
 const offersList = document.querySelector("#offers-list");
 const offersCaption = document.querySelector("#offers-caption");
 const moreButton = document.querySelector("#load-more-button");
+let savedResponse = null;
+const SEARCH_STATE_KEY = "multimarket.search.v1";
 let activeQuery = "";
 let bufferedProducts = [];
 let displayedProductCount = 0;
@@ -170,9 +172,17 @@ function renderOffers(products, query, append) {
       watch.addEventListener("click", async () => {
         watch.disabled = true;
         try {
+          const authResponse = await fetch("/api/auth/me");
+          if (!authResponse.ok) throw new Error("Не удалось проверить вход.");
+          const auth = await authResponse.json();
+          if (!auth.authenticated) {
+            saveSearchState();
+            location.assign("/login?next=/");
+            return;
+          }
           const response = await fetch("/api/monitors", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": auth.csrf_token },
             body: JSON.stringify({
               query, product_url: offer.url, marketplace: offer.marketplace,
               title: offer.title, interval_seconds: 3600
@@ -234,6 +244,7 @@ async function fetchSearchResults(sequence = searchSequence) {
   if (sequence !== searchSequence) return null;
   if (!response.ok) throw new Error(data.detail || "Не удалось выполнить поиск.");
 
+  savedResponse = data;
   bufferedProducts = Array.isArray(data.products) ? data.products : [];
   displayedProductCount = 0;
   title.textContent = "Результаты для «" + data.query + "»";
@@ -253,11 +264,14 @@ async function fetchSearchResults(sequence = searchSequence) {
     message(notice, data.notice);
   }
   updateMoreButton();
+  saveSearchState();
   return data;
 }
 async function runSearch(query) {
   activeQuery = query.trim();
   if (!activeQuery) return;
+  savedResponse = null;
+  try { sessionStorage.removeItem(SEARCH_STATE_KEY); } catch {}
   bufferedProducts = [];
   displayedProductCount = 0;
   const sequence = ++searchSequence;
@@ -298,4 +312,39 @@ moreButton.addEventListener("click", () => {
   moreButton.textContent = "Показываем…";
   revealNextProducts();
   moreButton.disabled = false;
+  saveSearchState();
 });
+
+function saveSearchState() {
+  if (!savedResponse) return;
+  try {
+    sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
+      version: 1, query: activeQuery, data: savedResponse,
+      displayed: displayedProductCount, scrollY: window.scrollY
+    }));
+  } catch { /* Browsing also works when storage is unavailable or full. */ }
+}
+function restoreSearchState() {
+  try {
+    const state = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || "null");
+    if (!state || state.version !== 1 || typeof state.query !== "string" ||
+        !Array.isArray(state.data?.products) || !Number.isInteger(state.displayed)) return;
+    savedResponse = state.data;
+    activeQuery = state.query;
+    input.value = activeQuery;
+    bufferedProducts = state.data.products;
+    displayedProductCount = Math.min(Math.max(state.displayed, DISPLAY_BATCH_SIZE), bufferedProducts.length);
+    title.textContent = "Результаты для «" + activeQuery + "»";
+    renderProviders(state.data.providers);
+    renderOffers(bufferedProducts.slice(0, displayedProductCount), activeQuery, false);
+    emptyState.hidden = Boolean(bufferedProducts.length);
+    message(notice, state.data.notice);
+    updateMoreButton();
+    requestAnimationFrame(() => window.scrollTo(0, Number(state.scrollY) || 0));
+  } catch { /* Ignore an outdated or incomplete saved search. */ }
+}
+window.addEventListener("pagehide", saveSearchState);
+document.addEventListener("click", event => {
+  if (event.target.closest("a")) saveSearchState();
+});
+restoreSearchState();

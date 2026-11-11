@@ -18,6 +18,12 @@ class MonitoringApiTests(unittest.TestCase):
         self.path_patcher.start()
         monitoring.init_db()
         self.client = TestClient(app)
+        csrf = self.client.get("/api/auth/me").json()["csrf_token"]
+        response = self.client.post("/api/auth/register", json={
+            "name": "Test", "email": "test@example.test", "password": "test-password"
+        }, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(response.status_code, 201)
+        self.client.headers["X-CSRF-Token"] = self.client.get("/api/auth/me").json()["csrf_token"]
 
     def tearDown(self):
         self.client.close()

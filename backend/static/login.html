@@ -5,12 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f6fb">
   <title>Вход — MultiMarket</title>
+  <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
+  <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/login.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
     <nav class="main-nav" aria-label="Главная навигация">
       <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
       <a href="/history">История цен</a><a href="/sources">Источники</a>
@@ -21,8 +24,16 @@
     <section class="auth-card">
       <div class="eyebrow"><span class="eyebrow-dot"></span> MULTIMARKET</div>
       <h1>Вход в аккаунт</h1>
-      <p class="auth-intro">Войдите через Google или Яндекс, чтобы открыть профиль и личные настройки.</p>
+      <p class="auth-intro">Войдите по почте и паролю, чтобы видеть свои отслеживаемые товары.</p>
       <div id="login-error" class="auth-message" role="status" hidden></div>
+      <form id="password-form" class="password-form">
+        <label id="name-field" hidden>Имя<input id="login-name" name="name" autocomplete="name" maxlength="160"></label>
+        <label>Электронная почта<input id="login-email" name="email" type="email" autocomplete="username" required maxlength="254"></label>
+        <label>Пароль<input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="128"></label>
+        <p id="password-hint" class="muted" hidden>От 8 до 128 символов.</p>
+        <button id="password-submit" class="button button-primary" type="submit">Войти</button>
+        <button id="switch-mode" class="auth-switch" type="button">Нет аккаунта? Зарегистрироваться</button>
+      </form>
       <div class="oauth-buttons">
         <a id="google-login" class="oauth-button oauth-google" href="/auth/google" hidden>
           <span class="oauth-mark">G</span><span>Продолжить с Google</span><span aria-hidden="true">→</span>
@@ -37,4 +48,3 @@
   </main>
 </body>
 </html>
-

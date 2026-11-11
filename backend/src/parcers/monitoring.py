@@ -35,6 +35,25 @@ def _connect() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     with _connect() as db:
+        columns = [r["name"] for r in db.execute("PRAGMA table_info(monitors)")]
+        if columns and "user_id" not in columns:
+            schema = db.execute("SELECT sql FROM sqlite_master WHERE name = 'monitors'").fetchone()[0]
+            schema = schema.replace("CREATE TABLE monitors", "CREATE TABLE monitors_new", 1)
+            schema = schema.replace("UNIQUE(product_url)", "user_id TEXT, UNIQUE(user_id, product_url)")
+            db.execute("PRAGMA foreign_keys = OFF")
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(schema)
+                names = ", ".join(columns)
+                db.execute(f"INSERT INTO monitors_new ({names}) SELECT {names} FROM monitors")
+                db.execute("DROP TABLE monitors")
+                db.execute("ALTER TABLE monitors_new RENAME TO monitors")
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.execute("PRAGMA foreign_keys = ON")
         db.executescript("""
         CREATE TABLE IF NOT EXISTS monitors (
             id TEXT PRIMARY KEY,
@@ -50,8 +69,10 @@ def init_db() -> None:
             next_run_at TEXT NOT NULL,
             last_status TEXT NOT NULL DEFAULT 'pending',
             created_at TEXT NOT NULL,
-            UNIQUE(product_url)
+            user_id TEXT,
+            UNIQUE(user_id, product_url)
         );
+        CREATE INDEX IF NOT EXISTS idx_monitors_user ON monitors(user_id);
         CREATE TABLE IF NOT EXISTS price_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             monitor_id TEXT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
@@ -74,17 +95,17 @@ def init_db() -> None:
 
 
 def create_monitor(*, query: str, product_url: str, marketplace: str, title: str,
-                   interval_seconds: int) -> dict[str, Any]:
+                   interval_seconds: int, user_id: str | None = None) -> dict[str, Any]:
     now = _now()
     monitor_id = str(uuid.uuid4())
     with _connect() as db:
         db.execute(
             """INSERT INTO monitors
             (id, query, product_url, marketplace, title, interval_seconds,
-             active, next_run_at, last_status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, 'pending', ?)""",
+             active, next_run_at, last_status, created_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, 'pending', ?, ?)""",
             (monitor_id, query, product_url, marketplace, title, interval_seconds,
-             now.isoformat(), now.isoformat()),
+             now.isoformat(), now.isoformat(), user_id),
         )
         row = db.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
     return _monitor_dict(row)
@@ -96,19 +117,19 @@ def _monitor_dict(row: sqlite3.Row) -> dict[str, Any]:
     return result
 
 
-def list_monitors() -> list[dict[str, Any]]:
+def list_monitors(user_id: str | None = None) -> list[dict[str, Any]]:
     with _connect() as db:
-        rows = db.execute("SELECT * FROM monitors ORDER BY created_at DESC").fetchall()
+        rows = db.execute("SELECT * FROM monitors" + (" WHERE user_id = ?" if user_id is not None else "") + " ORDER BY created_at DESC", (user_id,) if user_id is not None else ()).fetchall()
     return [_monitor_dict(row) for row in rows]
 
 
-def get_monitor(monitor_id: str) -> dict[str, Any] | None:
+def get_monitor(monitor_id: str, user_id: str | None = None) -> dict[str, Any] | None:
     with _connect() as db:
-        row = db.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
+        row = db.execute("SELECT * FROM monitors WHERE id = ?" + (" AND user_id = ?" if user_id is not None else ""), (monitor_id, user_id) if user_id is not None else (monitor_id,)).fetchone()
     return _monitor_dict(row) if row else None
 
 
-def update_monitor(monitor_id: str, *, active: bool | None = None,
+def update_monitor(monitor_id: str, *, user_id: str | None = None, active: bool | None = None,
                    interval_seconds: int | None = None) -> dict[str, Any] | None:
     assignments, values = [], []
     if active is not None:
@@ -120,13 +141,15 @@ def update_monitor(monitor_id: str, *, active: bool | None = None,
     if assignments:
         values.append(monitor_id)
         with _connect() as db:
-            db.execute(f"UPDATE monitors SET {', '.join(assignments)} WHERE id = ?", values)
-    return get_monitor(monitor_id)
+            if user_id is not None:
+                values.append(user_id)
+            db.execute(f"UPDATE monitors SET {', '.join(assignments)} WHERE id = ?" + (" AND user_id = ?" if user_id is not None else ""), values)
+    return get_monitor(monitor_id, user_id)
 
 
-def delete_monitor(monitor_id: str) -> bool:
+def delete_monitor(monitor_id: str, user_id: str | None = None) -> bool:
     with _connect() as db:
-        cursor = db.execute("DELETE FROM monitors WHERE id = ?", (monitor_id,))
+        cursor = db.execute("DELETE FROM monitors WHERE id = ?" + (" AND user_id = ?" if user_id is not None else ""), (monitor_id, user_id) if user_id is not None else (monitor_id,))
     return cursor.rowcount > 0
 
 
@@ -135,7 +158,7 @@ def due_monitors(limit: int = 25) -> list[dict[str, Any]]:
     with _connect() as db:
         rows = db.execute(
             """SELECT * FROM monitors
-            WHERE active = 1 AND next_run_at <= ?
+            WHERE active = 1 AND next_run_at <= ? AND user_id IS NOT NULL
             ORDER BY next_run_at LIMIT ?""",
             (now, limit),
         ).fetchall()
@@ -198,7 +221,7 @@ async def send_telegram_alert(alert: dict[str, Any], monitor: dict[str, Any]) ->
     """Send opt-in price alerts; credentials stay in server environment."""
     token = os.getenv("MULTIMARKET_TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("MULTIMARKET_TELEGRAM_CHAT_ID")
-    if not token or not chat_id:
+    if monitor.get("user_id") or not token or not chat_id:
         return
     import httpx
 
@@ -230,18 +253,17 @@ def price_history(monitor_id: str, limit: int = 500) -> list[dict[str, Any]]:
     return [dict(row) for row in reversed(rows)]
 
 
-def list_alerts(monitor_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+def list_alerts(monitor_id: str | None = None, limit: int = 100, user_id: str | None = None) -> list[dict[str, Any]]:
+    conditions, values = [], []
+    if monitor_id:
+        conditions.append("a.monitor_id = ?")
+        values.append(monitor_id)
+    if user_id is not None:
+        conditions.append("m.user_id = ?")
+        values.append(user_id)
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
     with _connect() as db:
-        if monitor_id:
-            rows = db.execute(
-                """SELECT * FROM price_alerts WHERE monitor_id = ?
-                ORDER BY created_at DESC LIMIT ?""", (monitor_id, limit)
-            ).fetchall()
-        else:
-            rows = db.execute(
-                "SELECT * FROM price_alerts ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = db.execute("SELECT a.* FROM price_alerts a JOIN monitors m ON m.id = a.monitor_id" + where + " ORDER BY a.created_at DESC LIMIT ?", (*values, limit)).fetchall()
     return [dict(row) for row in rows]
 
 

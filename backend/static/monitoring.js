@@ -1,3 +1,4 @@
+let monitorCsrfToken = "";
 const list = document.querySelector("#monitor-list");
 const note = document.querySelector("#page-message");
 function el(tag, cls, text) {
@@ -18,6 +19,11 @@ function priceText(value, currency) {
 }
 async function loadMonitors() {
   try {
+    const authResponse = await fetch("/api/auth/me");
+    if (!authResponse.ok) throw new Error("Не удалось проверить вход.");
+    const auth = await authResponse.json();
+    if (!auth.authenticated) { location.replace("/login?next=/monitoring"); return; }
+    monitorCsrfToken = auth.csrf_token;
     const response = await fetch("/api/monitors");
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Не удалось загрузить мониторинг.");
@@ -39,18 +45,12 @@ async function loadMonitors() {
       const toggle = el("button", "button button-secondary", monitor.active ? "Пауза" : "Продолжить");
       toggle.type = "button";
       toggle.addEventListener("click", async () => {
-        await fetch("/api/monitors/" + monitor.id, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active: !monitor.active })
-        });
-        await loadMonitors();
+        await changeMonitor(monitor.id, "PATCH", { active: !monitor.active });
       });
       const remove = el("button", "button button-danger", "Удалить");
       remove.type = "button";
       remove.addEventListener("click", async () => {
-        await fetch("/api/monitors/" + monitor.id, { method: "DELETE" });
-        await loadMonitors();
+        await changeMonitor(monitor.id, "DELETE");
       });
       const productLink = el("a", "button button-primary", "Открыть товар ↗");
       productLink.href = monitor.product_url;
@@ -66,3 +66,17 @@ async function loadMonitors() {
 }
 document.querySelector("#refresh-monitors").addEventListener("click", loadMonitors);
 loadMonitors();
+
+async function changeMonitor(id, method, body) {
+  try {
+    const response = await fetch("/api/monitors/" + id, {
+      method, headers: { "Content-Type": "application/json", "X-CSRF-Token": monitorCsrfToken },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (response.status === 401) { location.replace("/login?next=/monitoring"); return; }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Не удалось изменить товар.");
+    showNote("");
+    await loadMonitors();
+  } catch (error) { showNote(error.message); }
+}

@@ -21,7 +21,7 @@ fetch("/api/auth/me", { headers: { Accept: "application/json" } })
     csrfToken = data.csrf_token || "";
     document.querySelector("#account-name").textContent = user.name || "Пользователь";
     document.querySelector("#account-email").textContent = user.email || "Email не передан провайдером";
-    document.querySelector("#account-provider").textContent = user.provider === "google" ? "Google" : "Яндекс";
+    document.querySelector("#account-provider").textContent = ({ google: "Google", yandex: "Яндекс", local: "Почта и пароль" })[user.provider] || user.provider;
     document.querySelector("#account-role").textContent = user.role === "admin" ? "Администратор" : "Пользователь";
     document.querySelector("#account-created").textContent = dateText(user.created_at);
     if (user.picture_url && user.picture_url.startsWith("https://")) {
@@ -49,4 +49,3 @@ document.querySelector("#logout-button").addEventListener("click", async event =
     button.disabled = false;
   }
 });
-

@@ -5,6 +5,10 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import sqlite3
+import hashlib
+import hmac
+import re
+import secrets
 import time
 import uuid
 from typing import Any, Iterator
@@ -43,7 +47,15 @@ def _connect() -> Iterator[sqlite3.Connection]:
             verifier TEXT NOT NULL,
             expires_at REAL NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS auth_attempts (
+            key TEXT NOT NULL,
+            attempted_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_attempts ON auth_attempts(key, attempted_at);
         """)
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
+        if "password_hash" not in columns:
+            db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
         yield db
         db.commit()
     except Exception:
@@ -56,6 +68,64 @@ def _connect() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     with _connect():
         pass
+
+
+def _password_hash(password: str, salt: str) -> str:
+    return hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt),
+                          n=16384, r=8, p=1).hex()
+
+
+def allow_auth_attempt(email: str, address: str) -> bool:
+    now = time.time()
+    keys = ["email:" + email.strip().lower(), "ip:" + address]
+    with _connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        db.execute("DELETE FROM auth_attempts WHERE attempted_at < ?", (now - 900,))
+        for key, limit in zip(keys, (10, 50)):
+            if db.execute("SELECT COUNT(*) FROM auth_attempts WHERE key = ?", (key,)).fetchone()[0] >= limit:
+                return False
+        db.executemany("INSERT INTO auth_attempts VALUES (?, ?)", [(key, now) for key in keys])
+    return True
+
+
+def register_user(*, email: str, password: str, name: str) -> dict[str, Any]:
+    email = email.strip().lower()
+    name = name.strip()
+    if len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        raise ValueError("Укажите корректный email")
+    if not name or len(name) > 160:
+        raise ValueError("Укажите имя длиной до 160 символов")
+    if not 8 <= len(password) <= 128:
+        raise ValueError("Пароль должен содержать от 8 до 128 символов")
+    salt = secrets.token_hex(16)
+    encoded = salt + ":" + _password_hash(password, salt)
+    now = _now()
+    user_id = str(uuid.uuid4())
+    with _connect() as db:
+        try:
+            db.execute(
+                """INSERT INTO users
+                (id, provider, subject, email, name, role, created_at, last_login_at, password_hash)
+                VALUES (?, 'local', ?, ?, ?, 'user', ?, ?, ?)""",
+                (user_id, email, email, name, now, now, encoded),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("Аккаунт с этим email уже зарегистрирован") from exc
+        return _to_dict(db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()) or {}
+
+
+def authenticate_user(*, email: str, password: str) -> dict[str, Any] | None:
+    with _connect() as db:
+        row = db.execute("SELECT * FROM users WHERE provider = 'local' AND subject = ?",
+                         (email.strip().lower(),)).fetchone()
+        # Perform the same expensive calculation for unknown addresses.
+        encoded = row["password_hash"] if row else None
+        salt, expected = encoded.split(":") if encoded else ("00" * 16, "00" * 64)
+        actual = _password_hash(password, salt)
+        if not hmac.compare_digest(expected, actual) or row is None:
+            return None
+        db.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_now(), row["id"]))
+        return _to_dict(db.execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone())
 
 
 def save_oauth_transaction(*, state: str, provider: str, verifier: str) -> None:
@@ -170,4 +240,3 @@ def admin_count() -> int:
     with _connect() as db:
         row = db.execute("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'").fetchone()
         return int(row["total"])
-

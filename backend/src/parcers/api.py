@@ -68,6 +68,14 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def private_response_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith(("/api/auth", "/api/monitors", "/api/alerts", "/api/admin")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 class BatchSearchRequest(BaseModel):
     queries: list[str] = Field(min_length=1, max_length=10)
     limit: int = Field(default=20, ge=1, le=50)
@@ -86,6 +94,15 @@ class MonitorUpdate(BaseModel):
     interval_seconds: int | None = Field(default=None, ge=900, le=604800)
 
 
+class PasswordLogin(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordRegister(PasswordLogin):
+    name: str = Field(min_length=1, max_length=160)
+
+
 class AdminRoleUpdate(BaseModel):
     role: str = Field(pattern="^(user|admin)$")
 
@@ -100,9 +117,16 @@ def _admin_emails() -> set[str]:
 
 def _current_user(request: Request) -> dict | None:
     user = accounts.get_user(request.session.get("user_id"))
-    if user is None:
+    if user is None and request.session.get("user_id"):
         request.session.pop("user_id", None)
         request.session.pop("csrf_token", None)
+    return user
+
+
+def _require_user(request: Request) -> dict:
+    user = _current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется вход в аккаунт")
     return user
 
 
@@ -142,6 +166,11 @@ async def home():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(STATIC_DIR / "icons" / "favicon.ico", media_type="image/x-icon")
+
+
 @app.get("/product", include_in_schema=False)
 async def product_page():
     return FileResponse(STATIC_DIR / "product.html")
@@ -170,13 +199,17 @@ async def admin_page(request: Request):
 
 
 @app.get("/monitoring", include_in_schema=False)
-async def monitoring_page():
-    return FileResponse(STATIC_DIR / "monitoring.html")
+async def monitoring_page(request: Request):
+    if not _current_user(request):
+        return RedirectResponse("/login?next=/monitoring", status_code=303)
+    return _private_page(STATIC_DIR / "monitoring.html")
 
 
 @app.get("/history", include_in_schema=False)
-async def history_page():
-    return FileResponse(STATIC_DIR / "history.html")
+async def history_page(request: Request):
+    if not _current_user(request):
+        return RedirectResponse("/login?next=/history", status_code=303)
+    return _private_page(STATIC_DIR / "history.html")
 
 
 @app.get("/sources", include_in_schema=False)
@@ -193,6 +226,7 @@ async def health():
 async def auth_config(request: Request):
     user = _current_user(request)
     return {
+        "password_login": True,
         "providers": oauth.configured_providers(),
         "authenticated": user is not None,
         "user": user,
@@ -202,11 +236,37 @@ async def auth_config(request: Request):
 @app.get("/api/auth/me")
 async def auth_me(request: Request):
     user = _current_user(request)
-    return {
-        "authenticated": user is not None,
-        "user": user,
-        "csrf_token": request.session.get("csrf_token") if user else None,
-    }
+    if not request.session.get("csrf_token"):
+        request.session["csrf_token"] = secrets.token_urlsafe(32)
+    return {"authenticated": user is not None, "user": user,
+            "csrf_token": request.session["csrf_token"]}
+
+
+@app.post("/api/auth/register", status_code=201)
+def password_register(payload: PasswordRegister, request: Request):
+    _check_csrf(request)
+    if not accounts.allow_auth_attempt(payload.email, request.client.host if request.client else "unknown"):
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Попробуйте через 15 минут.")
+    try:
+        user = accounts.register_user(email=payload.email, password=payload.password, name=payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    request.session.clear()
+    request.session.update(user_id=user["id"], csrf_token=secrets.token_urlsafe(32))
+    return {"user": user, "authenticated": True}
+
+
+@app.post("/api/auth/login")
+def password_login(payload: PasswordLogin, request: Request):
+    _check_csrf(request)
+    if not accounts.allow_auth_attempt(payload.email, request.client.host if request.client else "unknown"):
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Попробуйте через 15 минут.")
+    user = accounts.authenticate_user(email=payload.email, password=payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Неверный email или пароль")
+    request.session.clear()
+    request.session.update(user_id=user["id"], csrf_token=secrets.token_urlsafe(32))
+    return {"user": user, "authenticated": True}
 
 
 @app.get("/auth/{provider}", include_in_schema=False)
@@ -378,7 +438,9 @@ async def batch_search(payload: BatchSearchRequest):
 
 
 @app.post("/api/monitors", status_code=201)
-async def create_monitor(payload: MonitorCreate):
+async def create_monitor(payload: MonitorCreate, request: Request):
+    user = _require_user(request)
+    _check_csrf(request)
     parsed = urlparse(payload.product_url)
     allowed_domains = MARKETPLACE_DOMAINS.get(payload.marketplace)
     if parsed.scheme != "https" or not parsed.hostname:
@@ -398,6 +460,7 @@ async def create_monitor(payload: MonitorCreate):
             marketplace=payload.marketplace.strip(),
             title=payload.title.strip(),
             interval_seconds=payload.interval_seconds,
+            user_id=user["id"],
         )
     except Exception as exc:
         if "UNIQUE constraint failed" in str(exc):
@@ -406,16 +469,17 @@ async def create_monitor(payload: MonitorCreate):
 
 
 @app.get("/api/monitors")
-async def get_monitors():
-    return {"monitors": monitoring.list_monitors()}
+async def get_monitors(request: Request):
+    return {"monitors": monitoring.list_monitors(_require_user(request)["id"])}
 
 
 @app.get("/api/monitors/export.csv")
-async def export_monitors():
+async def export_monitors(request: Request):
+    user = _require_user(request)
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(["title", "marketplace", "product_url", "current_price", "currency", "active", "last_status"])
-    for monitor in monitoring.list_monitors():
+    for monitor in monitoring.list_monitors(user["id"]):
         writer.writerow([
             monitor["title"], monitor["marketplace"], monitor["product_url"],
             monitor["current_price"], monitor["currency"], monitor["active"],
@@ -429,9 +493,11 @@ async def export_monitors():
 
 
 @app.patch("/api/monitors/{monitor_id}")
-async def patch_monitor(monitor_id: str, payload: MonitorUpdate):
+async def patch_monitor(monitor_id: str, payload: MonitorUpdate, request: Request):
+    user = _require_user(request)
+    _check_csrf(request)
     monitor = monitoring.update_monitor(
-        monitor_id, active=payload.active,
+        monitor_id, user_id=user["id"], active=payload.active,
         interval_seconds=payload.interval_seconds,
     )
     if not monitor:
@@ -440,25 +506,31 @@ async def patch_monitor(monitor_id: str, payload: MonitorUpdate):
 
 
 @app.delete("/api/monitors/{monitor_id}")
-async def remove_monitor(monitor_id: str):
-    if not monitoring.delete_monitor(monitor_id):
+async def remove_monitor(monitor_id: str, request: Request):
+    user = _require_user(request)
+    _check_csrf(request)
+    if not monitoring.delete_monitor(monitor_id, user["id"]):
         raise HTTPException(status_code=404, detail="Монитор не найден")
     return {"deleted": True, "id": monitor_id}
 
 
 @app.get("/api/monitors/{monitor_id}/history")
-async def get_monitor_history(monitor_id: str, limit: int = Query(default=200, ge=1, le=500)):
-    if not monitoring.get_monitor(monitor_id):
+async def get_monitor_history(monitor_id: str, request: Request, limit: int = Query(default=200, ge=1, le=500)):
+    if not monitoring.get_monitor(monitor_id, _require_user(request)["id"]):
         raise HTTPException(status_code=404, detail="Монитор не найден")
     return {"monitor_id": monitor_id, "points": monitoring.price_history(monitor_id, limit)}
 
 
 @app.get("/api/alerts")
 async def get_alerts(
+    request: Request,
     monitor_id: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
 ):
-    return {"alerts": monitoring.list_alerts(monitor_id, limit)}
+    user = _require_user(request)
+    if monitor_id and not monitoring.get_monitor(monitor_id, user["id"]):
+        raise HTTPException(status_code=404, detail="Монитор не найден")
+    return {"alerts": monitoring.list_alerts(monitor_id, limit, user["id"])}
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
