@@ -267,4 +267,3 @@ h1 span { color: var(--accent); }
   .admin-user-row { grid-template-columns: 1fr; }
   .admin-role-select { width: 100%; }
 }
-

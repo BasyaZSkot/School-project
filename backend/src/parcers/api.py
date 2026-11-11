@@ -462,4 +462,3 @@ async def get_alerts(
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-

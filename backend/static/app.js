@@ -299,4 +299,3 @@ moreButton.addEventListener("click", () => {
   revealNextProducts();
   moreButton.disabled = false;
 });
-
