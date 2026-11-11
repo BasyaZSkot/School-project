@@ -14,6 +14,9 @@ const results = document.querySelector("#results");
 const providerDetails = document.querySelector("#provider-details");
 const loading = document.querySelector("#search-loading");
 const searchGuide = document.querySelector("#search-guide");
+const Catalog = window.MultiMarketCatalog;
+const filterForm = document.querySelector("#catalog-filters");
+let filteredProducts = [];
 let savedResponse = null;
 const SEARCH_STATE_KEY = "multimarket.search.v1";
 let activeQuery = "";
@@ -59,7 +62,7 @@ function productsWord(n) {
 }
 function money(value, currency) {
   return new Intl.NumberFormat("ru-RU", {
-    style: "currency", currency: currency || "RUB", maximumFractionDigits: 2
+    style: "currency", currency: currency || "RUB", minimumFractionDigits: 0, maximumFractionDigits: 2
   }).format(value);
 }
 function renderProviders(providers) {
@@ -113,7 +116,7 @@ function renderOffers(products, query, append) {
     if (!offers.length) continue;
     const card = element("article", "offer-card");
     const head = element("div", "offer-product-head");
-    const imageUrl = offers.find(item => item.image_url && item.image_url.startsWith("https://"))?.image_url;
+    const imageUrl = offers.flatMap(Catalog.images)[0];
     if (imageUrl) {
       const image = element("img", "offer-product-image");
       image.src = imageUrl;
@@ -126,7 +129,7 @@ function renderOffers(products, query, append) {
     const productPage = element("a", "details-button", product.title || "Товар");
     const productSummary = {
       title: product.title || "Товар",
-      offers: offers.map(offer => ({
+      offers: (product.sourceOffers || offers).map(offer => ({
         marketplace: offer.marketplace,
         title: offer.title,
         price: offer.price,
@@ -134,27 +137,31 @@ function renderOffers(products, query, append) {
         url: offer.url,
         image_url: offer.image_url,
         external_id: offer.external_id,
-        in_stock: offer.in_stock
+        in_stock: offer.in_stock,
+        brand: offer.brand,
+        rating: offer.rating,
+        review_count: offer.review_count,
+        delivery: offer.delivery
       }))
     };
-    productPage.href = "/product?data=" + encodeURIComponent(JSON.stringify(productSummary));
+    const storageKey = "multimarket.product." + (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2));
+    productPage.href = "/product?data=" + encodeURIComponent(JSON.stringify(productSummary)) + "&key=" + encodeURIComponent(storageKey);
+    const saveProduct = () => {
+      try { sessionStorage.setItem(storageKey, JSON.stringify({title:product.title, offers:product.sourceOffers || offers})); } catch {}
+    };
+    productPage.addEventListener("click", saveProduct);
+    productPage.addEventListener("auxclick", saveProduct);
     const productHeading = element("h3");
     productHeading.append(productPage);
     head.append(productHeading);
     const rows = element("div", "offer-rows");
-    const minima = new Map();
-    offers.forEach(offer => {
-      const price = Number(offer.price);
-      const currency = offer.currency || "RUB";
-      if (Number.isFinite(price) && price > 0) {
-        minima.set(currency, Math.min(minima.get(currency) ?? price, price));
-      }
-    });
+    const best = Catalog.bestOffers(offers);
     offers.forEach(offer => {
       offerCount += 1;
       const row = element("div", "offer-row");
       const info = element("div", "offer-info");
       info.append(element("strong", "", offer.marketplace));
+      if (offer.in_stock === false) info.append(element("span", "stock-badge-empty", "Нет в наличии"));
       // Offers of the same product usually repeat the product's own title;
       // showing it again under every row just clutters the card, so only
       // add it when it actually differs (e.g. a seller-specific variant).
@@ -163,9 +170,15 @@ function renderOffers(products, query, append) {
       if (offerTitle && offerTitle !== productTitle) {
         info.append(element("span", "", offerTitle));
       }
-      if (offers.length > 1 && Number(offer.price) === minima.get(offer.currency || "RUB")) {
-        info.append(element("span", "best-price-badge", "Лучшая цена"));
+      for (const badge of Catalog.badges(offer, best)) {
+        const label = element("span", "best-price-badge", badge);
+        label.title = badge === "Лучшее предложение"
+          ? "Минимальная цена товара среди доступных предложений в этой валюте. Приоритет у товаров в наличии. Доставка не включена."
+          : badge === "Высокая оценка" ? "Оценка от 4,5 при наличии не менее 10 оценок." : "Опубликованный срок доставки — до 2 дней. Уточните его для своего адреса.";
+        info.append(label);
       }
+      if (Number(offer.rating) > 0) info.append(element("span", "offer-rating", "★ " + offer.rating + (offer.review_count != null ? " · оценок: " + offer.review_count : "")));
+      const delivery = element("p", "offer-delivery", Catalog.deliveryLabel(offer));
       const right = element("div", "offer-right");
       right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
       const actions = element("div", "offer-actions");
@@ -208,7 +221,7 @@ function renderOffers(products, query, append) {
       });
       actions.append(watch);
       right.append(actions);
-      row.append(info, right);
+      row.append(info, delivery, right);
       rows.append(row);
     });
     card.append(rows);
@@ -217,11 +230,11 @@ function renderOffers(products, query, append) {
     renderedCount += 1;
   }
   offersCaption.textContent = "Предложений: " + offerCount + ". Итоговую цену проверьте в магазине.";
-  count.textContent = "Показано " + productCount + " из " + bufferedProducts.length;
+  count.textContent = "Показано " + productCount + " из " + filteredProducts.length;
   return renderedCount;
 }
 function updateMoreButton() {
-  const remaining = Math.max(0, bufferedProducts.length - displayedProductCount);
+  const remaining = Math.max(0, filteredProducts.length - displayedProductCount);
   moreButton.hidden = remaining === 0;
   if (remaining > 0) {
     const nextBatch = Math.min(DISPLAY_BATCH_SIZE, remaining);
@@ -230,17 +243,77 @@ function updateMoreButton() {
 }
 function revealNextProducts() {
   const start = displayedProductCount;
-  const end = Math.min(start + DISPLAY_BATCH_SIZE, bufferedProducts.length);
+  const end = Math.min(start + DISPLAY_BATCH_SIZE, filteredProducts.length);
   if (end <= start) {
     updateMoreButton();
     return 0;
   }
-  const batch = bufferedProducts.slice(start, end);
+  const batch = filteredProducts.slice(start, end);
   const rendered = renderOffers(batch, activeQuery, start > 0);
   displayedProductCount = end;
   updateMoreButton();
   return rendered;
 }
+function readFilters() {
+  const values = {};
+  for (const key of ["min", "max", "currency", "sort", "marketplace", "brand", "rating", "delivery"]) {
+    values[key] = document.querySelector("#filter-" + key).value;
+  }
+  values.stock = document.querySelector("#filter-stock").checked;
+  return values;
+}
+function populateFilters(saved = {}) {
+  const offers = bufferedProducts.flatMap(p => p.offers || []);
+  for (const [key, values, label] of [
+    ["marketplace", offers.map(o => o.marketplace), "Все площадки"],
+    ["brand", offers.map(o => o.brand), "Все бренды"],
+    ["currency", offers.map(Catalog.currency), null]
+  ]) {
+    const select = document.querySelector("#filter-" + key);
+    select.replaceChildren();
+    if (label) select.append(new Option(label, ""));
+    [...new Set(values.filter(Boolean))].sort().forEach(value => select.append(new Option(value, value)));
+    if (key === "currency") select.value = offers.some(o => Catalog.currency(o) === "RUB") ? "RUB" : select.options[0]?.value || "RUB";
+  }
+  for (const [key, value] of Object.entries(saved)) {
+    const control = document.querySelector("#filter-" + key);
+    if (!control) continue;
+    if (key === "stock") control.checked = Boolean(value);
+    else if (control.tagName !== "SELECT" || [...control.options].some(o => o.value === value)) control.value = value;
+  }
+  filterForm.hidden = !bufferedProducts.length;
+}
+function applyFilters(displayed = DISPLAY_BATCH_SIZE) {
+  const filters = readFilters();
+  const feedback = document.querySelector("#filter-feedback");
+  if (filters.min !== "" && filters.max !== "" && Number(filters.min) > Number(filters.max)) {
+    feedback.textContent = "Цена «до» должна быть не меньше цены «от».";
+    return;
+  }
+  filteredProducts = Catalog.sortProducts(Catalog.filterProducts(bufferedProducts, filters), filters.sort, filters.currency);
+  displayedProductCount = Math.min(Math.max(DISPLAY_BATCH_SIZE, displayed), filteredProducts.length);
+  renderOffers(filteredProducts.slice(0, displayedProductCount), activeQuery, false);
+  updateMoreButton();
+  emptyState.hidden = Boolean(filteredProducts.length);
+  document.querySelector("#retry-search").textContent = bufferedProducts.length ? "Сбросить фильтры" : "Повторить поиск";
+  if (bufferedProducts.length && !filteredProducts.length) {
+    emptyState.querySelector("strong").textContent = "Нет подходящих товаров";
+    emptyState.querySelector("span").textContent = "Измените условия или сбросьте фильтры, чтобы увидеть все предложения.";
+    count.textContent = "Найдено: 0";
+  }
+  const active = [filters.min,filters.max,filters.brand,filters.marketplace,filters.rating,filters.delivery,filters.stock].filter(Boolean).length;
+  document.querySelector("#filter-active-count").textContent = active ? "· " + active : "";
+  feedback.textContent = "Подходит " + filteredProducts.length + " из " + bufferedProducts.length + " загруженных товаров. Сроки доставки зависят от адреса.";
+  saveSearchState();
+}
+function resetFilters() {
+  filterForm.reset();
+  populateFilters();
+  applyFilters();
+}
+filterForm.addEventListener("submit", event => event.preventDefault());
+filterForm.addEventListener("input", () => applyFilters());
+document.querySelector("#reset-filters").addEventListener("click", resetFilters);
 async function fetchSearchResults(sequence = searchSequence) {
   const params = new URLSearchParams({
     q: activeQuery,
@@ -259,10 +332,9 @@ async function fetchSearchResults(sequence = searchSequence) {
   displayedProductCount = 0;
   title.textContent = "Результаты для «" + data.query + "»";
   renderProviders(data.providers);
-  const firstBatch = bufferedProducts.slice(0, DISPLAY_BATCH_SIZE);
-  renderOffers(firstBatch, activeQuery, false);
-  displayedProductCount = firstBatch.length;
-  emptyState.hidden = Boolean(bufferedProducts.length);
+  filterForm.reset();
+  populateFilters();
+  applyFilters();
   providerDetails.open = !bufferedProducts.length;
   if (!bufferedProducts.length) {
     emptyState.querySelector("strong").textContent = "Товары не найдены";
@@ -284,6 +356,8 @@ async function runSearch(query) {
   savedResponse = null;
   try { sessionStorage.removeItem(SEARCH_STATE_KEY); } catch {}
   bufferedProducts = [];
+  filteredProducts = [];
+  document.querySelector("#retry-search").textContent = "Повторить поиск";
   displayedProductCount = 0;
   const sequence = ++searchSequence;
   results.hidden = false;
@@ -291,6 +365,7 @@ async function runSearch(query) {
   searchGuide.hidden = true;
   loading.hidden = false;
   providerDetails.hidden = true;
+  filterForm.hidden = true;
   providerDetails.open = false;
   count.textContent = "";
   input.value = activeQuery;
@@ -334,14 +409,14 @@ moreButton.addEventListener("click", () => {
   moreButton.disabled = false;
   saveSearchState();
 });
-document.querySelector("#retry-search").addEventListener("click", () => runSearch(activeQuery));
+document.querySelector("#retry-search").addEventListener("click", () => bufferedProducts.length ? resetFilters() : runSearch(activeQuery));
 
 function saveSearchState() {
   if (!savedResponse) return;
   try {
     sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
       version: 1, query: activeQuery, data: savedResponse,
-      displayed: displayedProductCount, scrollY: window.scrollY
+      displayed: displayedProductCount, scrollY: window.scrollY, filters:readFilters()
     }));
   } catch { /* Browsing also works when storage is unavailable or full. */ }
 }
@@ -354,13 +429,12 @@ function restoreSearchState() {
     activeQuery = state.query;
     input.value = activeQuery;
     bufferedProducts = state.data.products;
-    displayedProductCount = Math.min(Math.max(state.displayed, DISPLAY_BATCH_SIZE), bufferedProducts.length);
     results.hidden = false;
     searchGuide.hidden = true;
     title.textContent = "Результаты для «" + activeQuery + "»";
     renderProviders(state.data.providers);
-    renderOffers(bufferedProducts.slice(0, displayedProductCount), activeQuery, false);
-    emptyState.hidden = Boolean(bufferedProducts.length);
+    populateFilters(state.filters);
+    applyFilters(state.displayed);
     providerDetails.open = !bufferedProducts.length;
     if (!bufferedProducts.length) {
       emptyState.querySelector("strong").textContent = "Товары не найдены";

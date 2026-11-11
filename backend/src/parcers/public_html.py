@@ -14,6 +14,7 @@ from urllib.parse import quote_plus, urljoin, urlparse
 
 from .base import MAX_PROVIDER_LIMIT, Offer, ProviderResult, SearchStatus
 from .transport import ResilientFetcher, get_shared_fetcher
+from .product_data import MAX_REVIEWS, MAX_SPECIFICATIONS, image_urls, schema_delivery
 
 
 class _JsonLdParser(HTMLParser):
@@ -119,7 +120,7 @@ def _product_metadata(item: dict) -> dict:
             value = _as_text(prop.get("value") or prop.get("valueReference"))
             if name and value:
                 specifications.append({"name": name[:120], "value": value[:500]})
-            if len(specifications) >= 30:
+            if len(specifications) >= MAX_SPECIFICATIONS:
                 break
 
     raw_reviews = item.get("review") or item.get("reviews") or []
@@ -140,12 +141,12 @@ def _product_metadata(item: dict) -> dict:
                 review_rating = next((value for value in review_rating if isinstance(value, dict)), {})
             score = _number(review_rating.get("ratingValue")) if isinstance(review_rating, dict) else None
             reviews.append({
-                "body": body[:1200],
+                "body": body[:4000],
                 "author": author[:120] if author else "Покупатель",
                 "date": date[:40] if date else "",
                 "rating": str(score) if score is not None and score <= 5 else "",
             })
-            if len(reviews) >= 10:
+            if len(reviews) >= MAX_REVIEWS:
                 break
 
     return {
@@ -282,14 +283,7 @@ class PublicHtmlSearchAdapter:
                     currency = str(raw_offer.get("priceCurrency") or "RUB").upper()
                     if len(currency) != 3 or not currency.isalpha():
                         currency = "RUB"
-                    image = item.get("image")
-                    if isinstance(image, list):
-                        image = image[0] if image else None
-                    if isinstance(image, dict):
-                        image = image.get("url")
-                    image_url = urljoin(page_url, str(image)) if image else None
-                    if image_url and urlparse(image_url).scheme != "https":
-                        image_url = None
+                    images = image_urls(item.get("image"), page_url)
                     brand = _as_text(item.get("brand"))
                     availability = str(raw_offer.get("availability") or "").lower()
                     in_stock = True if "instock" in availability else False if "outofstock" in availability else None
@@ -304,7 +298,9 @@ class PublicHtmlSearchAdapter:
                         brand=brand,
                         gtin=str(item.get("gtin13") or item.get("gtin") or "") or None,
                         in_stock=in_stock,
-                        image_url=image_url,
+                        image_url=images[0] if images else None,
+                        image_urls=images,
+                        delivery=schema_delivery(raw_offer),
                         **details,
                     ))
                     seen.add(product_url)
@@ -335,6 +331,7 @@ class PublicHtmlSearchAdapter:
             offers.append(Offer(
                 marketplace=self.marketplace, title=title, price=price,
                 currency=currency, url=product_url, image_url=image_url,
+                image_urls=image_urls(image, page_url),
                 external_id=item.get("sku") or None,
                 brand=item.get("brand") or None,
                 **details,
@@ -346,7 +343,9 @@ class PublicHtmlSearchAdapter:
 
     def _extract_product(self, html: str, page_url: str) -> Offer | None:
         expected_path = urlparse(page_url).path.rstrip("/")
-        for offer in self._extract(html, page_url, 50):
+        # Search overrides may prioritize recommendation tiles on a product
+        # page. Product details must read the page's own structured Product.
+        for offer in PublicHtmlSearchAdapter._extract(self, html, page_url, 50):
             if urlparse(offer.url).path.rstrip("/") == expected_path:
                 return offer
         return None

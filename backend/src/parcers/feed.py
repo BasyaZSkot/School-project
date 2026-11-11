@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import MAX_PROVIDER_LIMIT, DisabledAdapter, Offer, ProviderResult, SearchStatus
+from .product_data import MAX_REVIEWS, MAX_SPECIFICATIONS, delivery_data, image_urls
 
 
 class JsonFeedAdapter(DisabledAdapter):
@@ -81,18 +82,18 @@ class JsonFeedAdapter(DisabledAdapter):
             raw_specs = item.get("specifications")
             specifications = [
                 {"name": str(spec["name"]).strip()[:120], "value": str(spec["value"]).strip()[:500]}
-                for spec in raw_specs[:30]
+                for spec in raw_specs[:MAX_SPECIFICATIONS]
                 if isinstance(spec, dict) and spec.get("name") and spec.get("value")
             ] if isinstance(raw_specs, list) else []
             raw_reviews = item.get("reviews")
             reviews = [
                 {
-                    "body": str(review["body"]).strip()[:1200],
+                    "body": str(review["body"]).strip()[:4000],
                     "author": str(review.get("author") or "Покупатель").strip()[:120],
                     "date": str(review.get("date") or "").strip()[:40],
                     "rating": str(review.get("rating") or "").strip()[:10],
                 }
-                for review in raw_reviews[:10]
+                for review in raw_reviews[:MAX_REVIEWS]
                 if isinstance(review, dict) and review.get("body")
             ] if isinstance(raw_reviews, list) else []
             return Offer(
@@ -107,6 +108,8 @@ class JsonFeedAdapter(DisabledAdapter):
                 gtin=str(item["gtin"]) if item.get("gtin") else None,
                 in_stock=item.get("in_stock") if isinstance(item.get("in_stock"), bool) else None,
                 image_url=str(image_url) if image_url else None,
+                image_urls=image_urls([image_url, item.get("image_urls") or item.get("images")]),
+                delivery=delivery_data(item.get("delivery")),
                 description=str(item["description"]).strip()[:5000] if item.get("description") else None,
                 rating=rating,
                 review_count=review_count,

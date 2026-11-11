@@ -10,6 +10,7 @@
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/catalog.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -58,6 +59,25 @@
         <span class="result-count" id="result-count"></span>
       </div>
       <p class="loading-card" id="search-loading" role="status" hidden>Ищем доступные предложения…</p>
+      <form id="catalog-filters" class="catalog-filters" aria-label="Фильтры товаров" hidden>
+        <div class="filter-primary">
+          <label>Цена от<input id="filter-min" type="number" min="0" step="any" placeholder="0" inputmode="decimal"></label>
+          <label>Цена до<input id="filter-max" type="number" min="0" step="any" placeholder="Любая" inputmode="decimal"></label>
+          <label>Валюта<select id="filter-currency"><option value="RUB">RUB</option></select></label>
+          <label class="filter-sort">Порядок<select id="filter-sort"><option value="relevance">Как в поиске</option><option value="price-asc">Сначала дешевле</option><option value="price-desc">Сначала дороже</option><option value="rating">По оценке</option><option value="delivery">По сроку доставки</option></select></label>
+        </div>
+        <details class="filter-more">
+          <summary>Ещё фильтры <span id="filter-active-count"></span></summary>
+          <div class="filter-secondary">
+            <label>Площадка<select id="filter-marketplace"><option value="">Все площадки</option></select></label>
+            <label>Бренд<select id="filter-brand"><option value="">Все бренды</option></select></label>
+            <label>Оценка<select id="filter-rating"><option value="">Любая</option><option value="4">От 4</option><option value="4.5">От 4,5</option><option value="4.8">От 4,8</option></select></label>
+            <label>Доставка<select id="filter-delivery"><option value="">Любой срок</option><option value="1">До 1 дня</option><option value="3">До 3 дней</option><option value="7">До недели</option><option value="known">Срок известен</option></select></label>
+            <label class="filter-checkbox"><input id="filter-stock" type="checkbox">Только в наличии</label>
+          </div>
+        </details>
+        <div class="filter-footer"><p id="filter-feedback" role="status">Фильтры применяются к загруженным товарам.</p><button id="reset-filters" class="text-button" type="button">Сбросить фильтры</button></div>
+      </form>
       <div class="offers-wrap" id="offers-wrap" hidden>
         <p class="offers-caption" id="offers-caption" role="status"></p>
         <div id="offers-list" class="offers-list"></div>

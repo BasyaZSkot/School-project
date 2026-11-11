@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from .base import Offer
 from .public_html import _clean_description, _number, _price_from_offer, _review_total
 from .wb_adapter import wb_record_to_offer
+from .product_data import MAX_REVIEWS, MAX_SPECIFICATIONS, image_urls
 
 
 class _StateScriptParser(HTMLParser):
@@ -304,7 +305,7 @@ def _ozon_characteristics(widget: dict) -> list[dict[str, str]]:
                 value = str(values).strip()
             if name and value:
                 result.append({"name": str(name).strip()[:120], "value": value[:500]})
-            if len(result) >= 30:
+            if len(result) >= MAX_SPECIFICATIONS:
                 return result
     return result
 
@@ -325,13 +326,13 @@ def _ozon_review_entries(widget: dict) -> list[dict[str, str]]:
         raw_rating = _ozon_named_scalar(node, ("ratingValue", "reviewRating", "rating"))
         rating = _number(raw_rating)
         reviews.append({
-            "body": body[:1200],
+            "body": body[:4000],
             "author": author[:120] if author else "Покупатель",
             "date": str(node.get("datePublished") or node.get("date") or "")[:40],
             "rating": str(rating) if rating is not None and rating <= 5 else "",
         })
         seen.add(body)
-        if len(reviews) >= 10:
+        if len(reviews) >= MAX_REVIEWS:
             break
     return reviews
 
@@ -343,6 +344,7 @@ def extract_ozon_product(html: str, page_url: str) -> Offer | None:
     product_id = None
     current_price = None
     image_url = None
+    gallery = []
     description = None
     rating = None
     review_count = None
@@ -372,13 +374,8 @@ def extract_ozon_product(html: str, page_url: str) -> Offer | None:
                     )
                 elif "webgallery" in name:
                     product_id = widget.get("sku") or product_id
-                    images = widget.get("images")
-                    if isinstance(images, list):
-                        for image in images:
-                            candidate = image.get("src") if isinstance(image, dict) else image
-                            if isinstance(candidate, str) and candidate.startswith("https://"):
-                                image_url = candidate
-                                break
+                    gallery = image_urls([gallery, widget.get("images")])
+                    image_url = gallery[0] if gallery else None
                 elif "webdescription" in name and not description:
                     description = _ozon_plain_text(
                         widget.get("description") or widget.get("html") or widget.get("content")
@@ -408,6 +405,7 @@ def extract_ozon_product(html: str, page_url: str) -> Offer | None:
         url=page_url,
         external_id=str(product_id or _ozon_sku_from_url(page_url) or "") or None,
         image_url=image_url,
+        image_urls=gallery,
         description=description,
         rating=rating,
         review_count=review_count,
