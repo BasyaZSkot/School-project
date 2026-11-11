@@ -13,6 +13,8 @@ MultiMarket — агрегатор поиска товаров на маркет
 - Диагностика пустой выдачи и HTTP-ограничений отдельно по каждой площадке.
 - Сервер возвращает до 200 карточек Яндекс Маркета одним ответом; браузер показывает первые 20, а кнопка раскрывает следующие 20 из полученного списка.
 - Карточки товаров с названием, изображением, ценой, площадкой, ссылкой и наличием (если эти поля доступны).
+- Отдельная страница для каждой карточки сравнения: предложения всех площадок, цена, описание и характеристики из доступной разметки.
+- Аккаунты через OAuth 2.0 Google и Яндекс, профиль и закрытая админ-панель с управлением ролями.
 - Единая модель предложения и группировка по GTIN, бренду/модели или нормализованному названию.
 - Независимые тайм-ауты источников: сбой одной площадки не отменяет результаты двух других.
 - Поддержка разрешённых JSON-фидов как дополнительного, более стабильного источника.
@@ -38,7 +40,25 @@ python -m pip install -r backend/requirements.txt
 uvicorn src.parcers.api:app --app-dir backend --reload
 ```
 
-Открой http://127.0.0.1:8000. Документация API: http://127.0.0.1:8000/docs.
+Открой http://localhost:8000. Документация API: http://localhost:8000/docs.
+
+## Вход и администрирование
+
+Скопируй `backend/.env.example` в `backend/.env`. В Google Cloud создай проект, заполни экран согласия OAuth, затем открой **Google Auth Platform → Clients → Create client → Web application**. Для тестового режима добавь свои аккаунты как test users. В список **Authorized redirect URIs** добавь точный адрес:
+
+```text
+http://localhost:8000/auth/google/callback
+```
+
+В [Яндекс OAuth](https://yandex.ru/dev/id/doc/ru/register-auth) создай приложение для входа на сторонний сайт, включи доступ к `login:info` и `login:email` и укажи Redirect URI:
+
+```text
+http://localhost:8000/auth/yandex/callback
+```
+
+Заполни `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` в `.env`. При локальном запуске открывай приложение по `http://localhost:8000`, чтобы домен совпадал с callback. Адреса возврата задаются в `GOOGLE_REDIRECT_URI` и `YANDEX_REDIRECT_URI`; для другого порта или домена используй соответствующий URL и внеси его в настройки OAuth-провайдера. В Google адрес должен совпадать полностью с зарегистрированным. В Yandex укажи схему, хост, порт и путь callback.
+
+Чтобы назначить первого администратора, укажи его email в `MULTIMARKET_ADMIN_EMAILS` до первого входа. Для постоянных окружений задай случайный `MULTIMARKET_SESSION_SECRET` и `MULTIMARKET_COOKIE_SECURE=true` при работе сайта по HTTPS. Файл `.env` игнорируется Git и не должен попадать в коммиты. Официальные инструкции: [Google OAuth для веб-сервера](https://developers.google.com/identity/protocols/oauth2/web-server) и [регистрация приложения Яндекс ID](https://yandex.com/dev/id/doc/en/register-client).
 
 ## Дополнительные JSON-фиды
 
@@ -80,3 +100,4 @@ GitHub Actions запускает тесты на push и pull request.
 ## Лицензии стороннего кода
 
 Реализация MultiMarket написана самостоятельно. Код Grex не копируется без лицензии или явного разрешения автора.
+

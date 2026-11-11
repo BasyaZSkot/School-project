@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>Вход — MultiMarket</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/login.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
+      <a href="/history">История цен</a><a href="/sources">Источники</a>
+    </nav>
+    <a class="top-action" href="/">К поиску</a>
+  </header>
+  <main class="page auth-page">
+    <section class="auth-card">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> MULTIMARKET</div>
+      <h1>Вход в аккаунт</h1>
+      <p class="auth-intro">Войдите через Google или Яндекс, чтобы открыть профиль и личные настройки.</p>
+      <div id="login-error" class="auth-message" role="status" hidden></div>
+      <div class="oauth-buttons">
+        <a id="google-login" class="oauth-button oauth-google" href="/auth/google" hidden>
+          <span class="oauth-mark">G</span><span>Продолжить с Google</span><span aria-hidden="true">→</span>
+        </a>
+        <a id="yandex-login" class="oauth-button oauth-yandex" href="/auth/yandex" hidden>
+          <span class="oauth-mark">Я</span><span>Продолжить с Яндексом</span><span aria-hidden="true">→</span>
+        </a>
+      </div>
+      <p id="provider-status" class="muted auth-provider-status">Проверяем доступные способы входа…</p>
+      <a class="auth-back" href="/">← Вернуться к поиску</a>
+    </section>
+  </main>
+</body>
+</html>
+

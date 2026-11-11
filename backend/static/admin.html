@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>Администрирование — MultiMarket</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/admin.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
+      <a href="/history">История цен</a><a href="/sources">Источники</a>
+    </nav>
+    <a class="top-action" href="/account">Аккаунт</a>
+  </header>
+  <main class="page">
+    <section class="page-intro page-intro-compact">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> УПРАВЛЕНИЕ</div>
+      <h1>Админ-панель</h1>
+      <p>Просматривайте аккаунты и меняйте роли пользователей.</p>
+    </section>
+    <section class="admin-panel">
+      <div class="section-toolbar"><div><h2>Пользователи</h2><p id="admin-count" class="muted"></p></div><button id="refresh-users" class="button button-secondary" type="button">Обновить</button></div>
+      <p id="admin-message" class="auth-message" role="status" hidden></p>
+      <div id="users-list" class="admin-user-list"></div>
+    </section>
+  </main>
+  <footer class="footer"><span>© MultiMarket</span><a href="/account">Профиль</a></footer>
+</body>
+</html>
+

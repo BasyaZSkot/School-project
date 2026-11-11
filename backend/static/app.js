@@ -16,11 +16,9 @@ let displayedProductCount = 0;
 let productCount = 0;
 let offerCount = 0;
 let searchSequence = 0;
-let detailRequestSequence = 0;
 const loadedProductIds = new Set();
 const MAX_BUFFERED_RESULTS = 200;
 const DISPLAY_BATCH_SIZE = 20;
-const productDialog = document.querySelector("#product-dialog");
 
 const providerMeta = {
   "Ozon": { logo: "O", className: "ozon-logo" },
@@ -118,6 +116,22 @@ function renderOffers(products, query, append) {
     }
     head.append(element("h3", "", product.title || "Товар"));
     card.append(head);
+    const productPage = element("a", "details-button", "Подробнее о товаре →");
+    const productSummary = {
+      title: product.title || "Товар",
+      offers: offers.map(offer => ({
+        marketplace: offer.marketplace,
+        title: offer.title,
+        price: offer.price,
+        currency: offer.currency,
+        url: offer.url,
+        image_url: offer.image_url,
+        external_id: offer.external_id,
+        in_stock: offer.in_stock
+      }))
+    };
+    productPage.href = "/product?data=" + encodeURIComponent(JSON.stringify(productSummary));
+    card.append(productPage);
     const rows = element("div", "offer-rows");
     const minima = new Map();
     offers.forEach(offer => {
@@ -146,10 +160,6 @@ function renderOffers(products, query, append) {
       const right = element("div", "offer-right");
       right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
       const actions = element("div", "offer-actions");
-      const detailsButton = element("button", "details-button", "Подробнее");
-      detailsButton.type = "button";
-      detailsButton.addEventListener("click", () => openProductDetails(offer));
-      actions.append(detailsButton);
       const link = element("a", "offer-open", "К товару ↗");
       link.href = offer.url;
       link.target = "_blank";
@@ -190,85 +200,6 @@ function renderOffers(products, query, append) {
   count.textContent = productCount + " товаров";
   return renderedCount;
 }
-function renderDetailFields(data, fallbackOffer) {
-  const details = data || fallbackOffer || {};
-  const description = details.description || "Описание не опубликовано в доступной разметке карточки.";
-  document.querySelector("#detail-description").textContent = description;
-  const rating = Number(details.rating);
-  document.querySelector("#detail-rating").textContent =
-    Number.isFinite(rating) && rating > 0 ? rating.toLocaleString("ru-RU", { maximumFractionDigits: 1 }) + " из 5" : "Нет данных";
-  const hasReviewCount = details.review_count !== null && details.review_count !== undefined && details.review_count !== "";
-  const reviews = Number(details.review_count);
-  document.querySelector("#detail-reviews").textContent =
-    hasReviewCount && Number.isFinite(reviews) && reviews >= 0 ? reviews.toLocaleString("ru-RU") : "Нет данных";
-
-  const specs = document.querySelector("#detail-specs");
-  specs.replaceChildren();
-  for (const item of Array.isArray(details.specifications) ? details.specifications : []) {
-    if (!item || !item.name || !item.value) continue;
-    specs.append(element("dt", "", item.name), element("dd", "", item.value));
-  }
-  if (!specs.childElementCount) specs.append(
-    element("dt", "detail-muted", "Сведения"),
-    element("dd", "detail-muted", "Характеристики не опубликованы.")
-  );
-
-  const reviewList = document.querySelector("#detail-review-list");
-  reviewList.replaceChildren();
-  const reviewEntries = Array.isArray(details.reviews) ? details.reviews.slice(0, 10) : [];
-  for (const review of reviewEntries) {
-    if (!review || !review.body) continue;
-    const card = element("article", "detail-review");
-    const header = element("div", "detail-review-head");
-    header.append(element("strong", "", review.author || "Покупатель"));
-    const meta = [review.rating ? `★ ${review.rating}` : "", review.date || ""].filter(Boolean).join(" · ");
-    if (meta) header.append(element("span", "", meta));
-    card.append(header, element("p", "", review.body));
-    reviewList.append(card);
-  }
-  if (!reviewList.childElementCount) {
-    reviewList.append(element("p", "detail-muted", "Публичные тексты отзывов не найдены."));
-  }
-}
-
-async function openProductDetails(offer) {
-  const requestSequence = ++detailRequestSequence;
-  const title = offer.title || "Товар";
-  document.querySelector("#detail-market").textContent = offer.marketplace || "Маркетплейс";
-  document.querySelector("#detail-title").textContent = title;
-  document.querySelector("#detail-price-value").textContent = money(offer.price, offer.currency);
-  const link = document.querySelector("#detail-link");
-  link.href = offer.url;
-  const image = document.querySelector("#detail-image");
-  image.hidden = !offer.image_url;
-  if (offer.image_url) image.src = offer.image_url;
-  else image.removeAttribute("src");
-  image.alt = title;
-  document.querySelector("#detail-status").textContent = "Загружаем доступные сведения о товаре…";
-  renderDetailFields(offer, offer);
-  productDialog.showModal();
-
-  const params = new URLSearchParams({ marketplace: offer.marketplace, product_url: offer.url });
-  try {
-    const response = await fetch("/api/product-details?" + params, {
-      headers: { Accept: "application/json" }
-    });
-    const data = await response.json();
-    if (requestSequence !== detailRequestSequence) return;
-    if (!response.ok) throw new Error(data.detail || "Не удалось загрузить подробности.");
-    renderDetailFields(data.details_available ? data : offer, offer);
-    document.querySelector("#detail-status").textContent = data.details_available
-      ? "Данные прочитаны из доступной публичной разметки карточки."
-      : (data.message || "Подробные поля не найдены на публичной странице.");
-  } catch (error) {
-    if (requestSequence !== detailRequestSequence) return;
-    renderDetailFields(offer, offer);
-    document.querySelector("#detail-status").textContent = error.message || "Не удалось загрузить подробности.";
-  }
-}
-
-document.querySelector("#detail-close").addEventListener("click", () => productDialog.close());
-
 function updateMoreButton() {
   const remaining = Math.max(0, bufferedProducts.length - displayedProductCount);
   moreButton.hidden = remaining === 0;
@@ -368,3 +299,4 @@ moreButton.addEventListener("click", () => {
   revealNextProducts();
   moreButton.disabled = false;
 });
+

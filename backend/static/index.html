@@ -20,7 +20,7 @@
       <a href="/history">История цен</a>
       <a href="/sources">Источники</a>
     </nav>
-    <a class="top-action" href="/sources">Подключить источник</a>
+    <a class="top-action" href="/account">Аккаунт</a>
   </header>
 
   <main class="page">
@@ -61,27 +61,9 @@
       </div>
       <div class="empty-state" id="empty-state"><div class="empty-icon">⌕</div><strong>Здесь появятся товары</strong><span>Введи название товара в строку поиска.</span></div>
       <div class="notice" id="notice" hidden><span class="notice-icon">i</span><p></p></div>
-      <dialog class="product-dialog" id="product-dialog" aria-labelledby="detail-title">
-        <div class="dialog-header">
-          <div><span class="detail-market" id="detail-market"></span><h2 id="detail-title">Товар</h2></div>
-          <button class="dialog-close" id="detail-close" type="button" aria-label="Закрыть подробности">×</button>
-        </div>
-        <div class="detail-summary">
-          <img id="detail-image" class="detail-image" alt="" hidden>
-          <div class="detail-price"><span>Цена предложения</span><strong id="detail-price-value"></strong></div>
-          <a id="detail-link" class="button button-primary" target="_blank" rel="noopener noreferrer">Открыть на площадке ↗</a>
-        </div>
-        <p class="detail-status" id="detail-status" role="status"></p>
-        <section class="detail-section"><h3>Описание</h3><p id="detail-description"></p></section>
-        <div class="detail-metrics">
-          <section class="detail-section"><h3>Рейтинг</h3><p id="detail-rating"></p></section>
-          <section class="detail-section"><h3>Количество отзывов и оценок</h3><p id="detail-reviews"></p></section>
-        </div>
-        <section class="detail-section"><h3>Отзывы покупателей</h3><div class="detail-review-list" id="detail-review-list"></div></section>
-        <section class="detail-section"><h3>Характеристики</h3><dl class="detail-specs" id="detail-specs"></dl></section>
-      </dialog>
     </section>
   </main>
   <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
 </body>
 </html>
+

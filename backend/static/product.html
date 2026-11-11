@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <meta name="description" content="Подробности и сравнение предложений товара.">
+  <title>Товар — MultiMarket</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/product.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="MultiMarket, поиск">
+      <span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
+      <a href="/history">История цен</a><a href="/sources">Источники</a>
+    </nav>
+    <a class="top-action" href="/account">Аккаунт</a>
+  </header>
+  <main class="page">
+    <a class="back-link" href="/">← Вернуться к поиску</a>
+    <section class="product-detail-hero" aria-live="polite">
+      <div id="product-image-wrap" class="product-detail-image-wrap" hidden>
+        <img id="product-image" class="product-detail-image" alt="">
+      </div>
+      <div class="product-detail-copy">
+        <div id="product-marketplaces" class="product-marketplaces"></div>
+        <h1 id="product-title">Загружаем товар…</h1>
+        <p id="product-status" class="detail-status" role="status">Читаем доступные публичные данные.</p>
+        <div id="product-best-price" class="product-best-price" hidden></div>
+      </div>
+    </section>
+
+    <section class="product-detail-section">
+      <div class="section-heading"><div><div class="section-kicker">СРАВНЕНИЕ</div><h2>Предложения магазинов</h2></div></div>
+      <div id="product-offers" class="product-offer-list"></div>
+    </section>
+
+    <div class="product-detail-columns">
+      <section class="product-detail-section detail-panel">
+        <div class="section-kicker">О ТОВАРЕ</div><h2>Описание</h2>
+        <p id="product-description" class="detail-body">Загрузка…</p>
+      </section>
+      <section class="product-detail-section detail-panel">
+        <div class="section-kicker">ХАРАКТЕРИСТИКИ</div><h2>Параметры товара</h2>
+        <dl id="product-specs" class="detail-specs"></dl>
+      </section>
+    </div>
+
+    <section class="product-detail-section detail-panel">
+      <div class="section-kicker">ОТЗЫВЫ</div><h2>Оценки и отзывы покупателей</h2>
+      <div class="product-review-summary"><strong id="product-rating">Нет данных</strong><span id="product-review-count">Нет данных</span></div>
+      <div id="product-reviews" class="detail-review-list"></div>
+    </section>
+  </main>
+  <footer class="footer"><span>© MultiMarket</span><a href="/">К поиску товаров</a></footer>
+</body>
+</html>
+

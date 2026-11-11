@@ -3,16 +3,21 @@ from dataclasses import asdict
 from pathlib import Path
 import asyncio
 import csv
+import hmac
+import os
+import secrets
 from io import StringIO
 from urllib.parse import urlparse
 
+import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, Response
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.sessions import SessionMiddleware
 
-from . import monitoring
+from . import accounts, monitoring, oauth
 from .service import MarketplaceSearchService, PROVIDER_FETCH_CAP
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -30,6 +35,7 @@ MARKETPLACE_DOMAINS = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     monitoring.init_db()
+    accounts.init_db()
     stop_event = asyncio.Event()
     task = asyncio.create_task(monitoring.monitoring_loop(search_service, stop_event))
     app.state.monitor_stop_event = stop_event
@@ -47,6 +53,18 @@ app = FastAPI(
         "подключаются через переменные окружения."
     ),
     lifespan=lifespan,
+)
+SESSION_SECRET = os.getenv("MULTIMARKET_SESSION_SECRET", "").strip() or secrets.token_urlsafe(48)
+SESSION_HTTPS_ONLY = os.getenv("MULTIMARKET_COOKIE_SECURE", "false").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    session_cookie="multimarket_session",
+    max_age=60 * 60 * 24 * 14,
+    same_site="lax",
+    https_only=SESSION_HTTPS_ONLY,
 )
 
 
@@ -68,9 +86,87 @@ class MonitorUpdate(BaseModel):
     interval_seconds: int | None = Field(default=None, ge=900, le=604800)
 
 
+class AdminRoleUpdate(BaseModel):
+    role: str = Field(pattern="^(user|admin)$")
+
+
+def _admin_emails() -> set[str]:
+    return {
+        item.strip().lower()
+        for item in os.getenv("MULTIMARKET_ADMIN_EMAILS", "").split(",")
+        if item.strip()
+    }
+
+
+def _current_user(request: Request) -> dict | None:
+    user = accounts.get_user(request.session.get("user_id"))
+    if user is None:
+        request.session.pop("user_id", None)
+        request.session.pop("csrf_token", None)
+    return user
+
+
+def _require_admin(request: Request) -> dict:
+    user = _current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется вход в аккаунт")
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Доступ только для администратора")
+    return user
+
+
+def _check_csrf(request: Request) -> None:
+    expected = request.session.get("csrf_token", "")
+    supplied = request.headers.get("x-csrf-token", "")
+    if not expected or not supplied or not hmac.compare_digest(expected, supplied):
+        raise HTTPException(status_code=403, detail="Проверка запроса не пройдена")
+
+
+def _safe_next_path(value: str | None) -> str:
+    if not value or "\\" in value:
+        return "/account"
+    parsed = urlparse(value)
+    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        return "/account"
+    return parsed.path + (("?" + parsed.query) if parsed.query else "")
+
+
+def _private_page(path: Path) -> FileResponse:
+    response = FileResponse(path)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/", include_in_schema=False)
 async def home():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/product", include_in_schema=False)
+async def product_page():
+    return FileResponse(STATIC_DIR / "product.html")
+
+
+@app.get("/login", include_in_schema=False)
+async def login_page():
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/account", include_in_schema=False)
+async def account_page(request: Request):
+    if not _current_user(request):
+        return RedirectResponse("/login?next=/account", status_code=303)
+    return _private_page(STATIC_DIR / "account.html")
+
+
+@app.get("/admin", include_in_schema=False)
+async def admin_page(request: Request):
+    user = _current_user(request)
+    if not user:
+        return RedirectResponse("/login?next=/admin", status_code=303)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Доступ только для администратора")
+    return _private_page(STATIC_DIR / "admin.html")
 
 
 @app.get("/monitoring", include_in_schema=False)
@@ -91,6 +187,114 @@ async def sources_page():
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "MultiMarket", "version": app.version}
+
+
+@app.get("/api/auth/config")
+async def auth_config(request: Request):
+    user = _current_user(request)
+    return {
+        "providers": oauth.configured_providers(),
+        "authenticated": user is not None,
+        "user": user,
+    }
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    user = _current_user(request)
+    return {
+        "authenticated": user is not None,
+        "user": user,
+        "csrf_token": request.session.get("csrf_token") if user else None,
+    }
+
+
+@app.get("/auth/{provider}", include_in_schema=False)
+async def begin_oauth(provider: str, request: Request):
+    if provider not in {"google", "yandex"}:
+        raise HTTPException(status_code=404, detail="Неизвестный провайдер входа")
+    verifier = secrets.token_urlsafe(48)
+    state = secrets.token_urlsafe(32)
+    try:
+        destination = oauth.authorization_url(provider, state, verifier)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail="Вход через этот сервис ещё не настроен") from exc
+    request.session.clear()
+    accounts.save_oauth_transaction(state=state, provider=provider, verifier=verifier)
+    request.session["oauth_state"] = state
+    request.session["oauth_provider"] = provider
+    request.session["oauth_next"] = _safe_next_path(request.query_params.get("next"))
+    return RedirectResponse(destination, status_code=302)
+
+
+@app.get("/auth/{provider}/callback", include_in_schema=False)
+async def finish_oauth(provider: str, request: Request):
+    if provider not in {"google", "yandex"}:
+        raise HTTPException(status_code=404, detail="Неизвестный провайдер входа")
+    expected_state = request.session.pop("oauth_state", "")
+    expected_provider = request.session.pop("oauth_provider", "")
+    next_path = _safe_next_path(request.session.pop("oauth_next", "/account"))
+    supplied_state = request.query_params.get("state", "")
+    if (
+        not expected_state
+        or expected_provider != provider
+        or not supplied_state
+        or not hmac.compare_digest(expected_state, supplied_state)
+    ):
+        request.session.clear()
+        raise HTTPException(status_code=400, detail="Сессия входа устарела. Начните вход заново.")
+    verifier = accounts.consume_oauth_transaction(state=supplied_state, provider=provider)
+    if not verifier:
+        request.session.clear()
+        raise HTTPException(status_code=400, detail="Сессия входа истекла. Начните вход заново.")
+    if request.query_params.get("error") or not request.query_params.get("code"):
+        request.session.clear()
+        return RedirectResponse("/login?error=cancelled", status_code=303)
+    try:
+        profile = await oauth.fetch_profile(provider, request.query_params["code"], verifier)
+        user = accounts.login_user(
+            provider=provider,
+            subject=str(profile["subject"]),
+            email=profile.get("email") if isinstance(profile.get("email"), str) else None,
+            name=profile.get("name") if isinstance(profile.get("name"), str) else None,
+            picture_url=profile.get("picture_url") if isinstance(profile.get("picture_url"), str) else None,
+            admin_emails=_admin_emails(),
+        )
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        request.session.clear()
+        return RedirectResponse("/login?error=provider", status_code=303)
+    request.session.clear()
+    request.session["user_id"] = user["id"]
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
+    return RedirectResponse(next_path, status_code=303)
+
+
+@app.post("/auth/logout")
+async def logout(request: Request):
+    if request.session.get("user_id"):
+        _check_csrf(request)
+    request.session.clear()
+    return {"logged_out": True}
+
+
+@app.get("/api/admin/users")
+async def admin_users(request: Request):
+    _require_admin(request)
+    return {"users": accounts.list_users()}
+
+
+@app.patch("/api/admin/users/{user_id}")
+async def update_user_role(user_id: str, payload: AdminRoleUpdate, request: Request):
+    current_user = _require_admin(request)
+    _check_csrf(request)
+    target = accounts.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if target["id"] == current_user["id"] and payload.role != "admin":
+        raise HTTPException(status_code=409, detail="Нельзя снять права администратора со своего аккаунта")
+    if target["role"] == "admin" and payload.role == "user" and accounts.admin_count() <= 1:
+        raise HTTPException(status_code=409, detail="В системе должен остаться хотя бы один администратор")
+    return accounts.set_role(user_id, payload.role)
 
 
 @app.get("/api/search")
@@ -258,3 +462,4 @@ async def get_alerts(
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+

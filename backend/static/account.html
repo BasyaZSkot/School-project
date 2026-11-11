@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>Аккаунт — MultiMarket</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/account.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
+      <a href="/history">История цен</a><a href="/sources">Источники</a>
+    </nav>
+    <a class="top-action" href="/">К поиску</a>
+  </header>
+  <main class="page auth-page">
+    <section class="account-card">
+      <div class="eyebrow"><span class="eyebrow-dot"></span> ЛИЧНЫЙ ПРОФИЛЬ</div>
+      <div class="account-profile">
+        <img id="account-picture" class="account-picture" alt="" hidden>
+        <div><h1 id="account-name">Загружаем профиль…</h1><p id="account-email" class="muted"></p></div>
+      </div>
+      <dl class="account-details">
+        <div><dt>Способ входа</dt><dd id="account-provider"></dd></div>
+        <div><dt>Роль</dt><dd id="account-role"></dd></div>
+        <div><dt>Создан</dt><dd id="account-created"></dd></div>
+      </dl>
+      <div class="account-actions">
+        <a id="admin-link" class="button button-secondary" href="/admin" hidden>Открыть админ-панель</a>
+        <button id="logout-button" class="button button-danger" type="button">Выйти</button>
+      </div>
+      <p id="account-message" class="auth-message" role="status" hidden></p>
+    </section>
+  </main>
+  <footer class="footer"><span>© MultiMarket</span><a href="/">К поиску товаров</a></footer>
+</body>
+</html>
+
