@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
-  <meta name="description" content="Поиск и сравнение цен на Wildberries, Ozon и Яндекс Маркете.">
+  <meta name="theme-color" content="#fafafa">
+  <meta name="description" content="Найдите нужный товар, сравните доступные предложения и следите за ценой.">
   <title>Поиск цен — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
@@ -13,59 +13,64 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="MultiMarket, поиск">
       <img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span>
     </a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a class="active" href="/">Поиск</a>
-      <a href="/monitoring">Мониторинг</a>
+      <a class="active" aria-current="page" href="/">Поиск</a>
+      <a href="/monitoring">Мои товары</a>
       <a href="/history">История цен</a>
-      <a href="/sources">Источники</a>
     </nav>
     <a class="top-action" href="/account">Аккаунт</a>
   </header>
 
-  <main class="page">
-    <section class="page-intro">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> СРАВНЕНИЕ МАРКЕТПЛЕЙСОВ</div>
-      <h1>Найди товар<br><span>по лучшей цене</span></h1>
-      <p>Сравни предложения Wildberries, Ozon и Яндекс Маркета в одном поиске.</p>
+  <main class="page search-page" id="main-content">
+    <section class="page-intro search-intro">
+      <h1>Нужный товар.<br><span>Подходящая цена.</span></h1>
+      <p>Найдите товар, сравните предложения и следите за ценой.</p>
     </section>
 
-    <form class="search-form" id="search-form">
+    <form class="search-form" id="search-form" role="search">
       <label class="sr-only" for="search-input">Название товара</label>
-      <span class="search-icon" aria-hidden="true">⌕</span>
+      <svg class="search-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
       <input id="search-input" name="q" type="search" maxlength="160"
-        placeholder="Например, Sony WH-1000XM5" autocomplete="off" required>
-      <button id="search-button" type="submit">Найти <span aria-hidden="true">→</span></button>
+        placeholder="Название товара или модель" autocomplete="off" aria-describedby="search-help" required>
+      <button id="search-button" type="submit">Найти</button>
     </form>
     <div class="search-examples">
-      <span>Популярные запросы</span>
+      <span>Например</span>
       <button class="example-query" type="button">iPhone 16</button>
       <button class="example-query" type="button">кофемашина</button>
       <button class="example-query" type="button">Sony WH-1000XM5</button>
     </div>
 
-    <section class="results-section" id="results" aria-live="polite">
+    <p class="search-help" id="search-help">Для точного поиска укажите бренд и модель товара.</p>
+    <div class="search-guide" id="search-guide">
+      <p>Понравился товар? Нажмите «Следить за ценой» в результатах.</p>
+      <a href="/monitoring">Мои товары <span aria-hidden="true">→</span></a>
+    </div>
+
+    <section class="results-section" id="results" aria-labelledby="results-title" aria-busy="false" hidden>
       <div class="section-heading">
-        <div><div class="section-kicker">РЕЗУЛЬТАТЫ ПОИСКА</div><h2 id="results-title">Готов к поиску</h2></div>
-        <span class="result-count" id="result-count">до 20 товаров</span>
+        <h2 id="results-title" aria-live="polite">Результаты поиска</h2>
+        <span class="result-count" id="result-count"></span>
       </div>
-      <div class="provider-grid" id="provider-grid">
-        <article class="provider-card"><div class="provider-top"><span class="provider-logo ozon-logo">O</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Ozon</h3><p>Проверим доступные предложения</p></article>
-        <article class="provider-card"><div class="provider-top"><span class="provider-logo wb-logo">WB</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Wildberries</h3><p>Проверим доступные предложения</p></article>
-        <article class="provider-card"><div class="provider-top"><span class="provider-logo ym-logo">Я</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Яндекс Маркет</h3><p>Проверим доступные предложения</p></article>
-      </div>
+      <p class="loading-card" id="search-loading" role="status" hidden>Ищем доступные предложения…</p>
       <div class="offers-wrap" id="offers-wrap" hidden>
-        <div class="offers-heading"><h3>Предложения</h3><span id="offers-caption"></span></div>
+        <p class="offers-caption" id="offers-caption" role="status"></p>
         <div id="offers-list" class="offers-list"></div>
         <button id="load-more-button" class="load-more-button" type="button" hidden>Показать ещё 20 товаров</button>
       </div>
-      <div class="empty-state" id="empty-state"><div class="empty-icon">⌕</div><strong>Здесь появятся товары</strong><span>Введи название товара в строку поиска.</span></div>
-      <div class="notice" id="notice" hidden><span class="notice-icon">i</span><p></p></div>
+      <div class="empty-state" id="empty-state" hidden><strong>Ничего не нашлось</strong><span>Уточните название или попробуйте другой запрос.</span><button class="button button-secondary" id="retry-search" type="button">Повторить поиск</button></div>
+      <div class="notice" id="notice" role="status" hidden><span class="notice-icon" aria-hidden="true">i</span><p></p></div>
+      <details class="provider-details" id="provider-details" hidden>
+        <summary>Площадки и доступность</summary>
+        <div class="provider-grid" id="provider-grid"></div>
+      </details>
     </section>
   </main>
-  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
+  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О сервисе</a></footer>
 </body>
 </html>

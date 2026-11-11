@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
+  <meta name="theme-color" content="#fafafa">
   <title>История цен — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
@@ -12,27 +12,27 @@
   <script src="/static/history.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
     <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
-      <a class="active" href="/history">История цен</a><a href="/sources">Источники</a>
+      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
+      <a class="active" aria-current="page" href="/history">История цен</a>
     </nav>
     <a class="top-action" href="/account">Аккаунт</a>
   </header>
-  <main class="page">
+  <main class="page" id="main-content">
     <section class="page-intro page-intro-compact">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> ДИНАМИКА</div>
       <h1>История цен</h1>
-      <p>Сохранённые проверки и изменения цены по товарам, за которыми ты следишь.</p>
+      <p>Посмотрите, как менялась цена ваших товаров.</p>
     </section>
     <div class="section-toolbar">
-      <div><h2 id="history-title">Все товары</h2><p class="muted">Новые точки появятся после успешной проверки источника.</p></div>
+      <div><h2 id="history-title">Все товары</h2><p class="muted">История обновляется после каждой успешной проверки цены.</p></div>
       <button class="button button-secondary" id="refresh-history" type="button">Обновить</button>
     </div>
     <div id="page-message" class="notice" hidden><span class="notice-icon">i</span><p></p></div>
     <div id="history-list" class="history-list"><div class="loading-card">Загружаем историю…</div></div>
   </main>
-  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
+  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О сервисе</a></footer>
 </body>
 </html>

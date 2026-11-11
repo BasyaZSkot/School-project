@@ -29,7 +29,13 @@ async function loadMonitors() {
     if (!response.ok) throw new Error(data.detail || "Не удалось загрузить мониторинг.");
     list.replaceChildren();
     if (!data.monitors.length) {
-      list.append(el("div", "empty-panel", "Пока нет отслеживаемых товаров. Добавь товар из поиска."));
+      const empty = el("div", "empty-panel");
+      empty.append(el("strong", "", "Сохраните первый товар"),
+        el("span", "", "Найдите товар и нажмите «Следить за ценой». Здесь появятся его цена и история."));
+      const search = el("a", "button button-primary", "Найти товар");
+      search.href = "/";
+      empty.append(search);
+      list.append(empty);
       return;
     }
     data.monitors.forEach(monitor => {

@@ -83,7 +83,13 @@ async function loadHistory() {
     if (selectedId) monitors = monitors.filter(monitor => monitor.id === selectedId);
     title.textContent = selectedId && monitors.length ? monitors[0].title : "История всех товаров";
     if (!monitors.length) {
-      list.replaceChildren(el("div", "empty-panel", "Нет товаров с историей. Добавь товар в мониторинг со страницы поиска."));
+      const empty = el("div", "empty-panel");
+      empty.append(el("strong", "", "История начинается с первого товара"),
+        el("span", "", "Добавьте товар из поиска. Его цена сохранится после успешной проверки."));
+      const search = el("a", "button button-primary", "Найти товар");
+      search.href = "/";
+      empty.append(search);
+      list.replaceChildren(empty);
       return;
     }
     const histories = await Promise.all(monitors.map(async monitor => {

@@ -10,6 +10,10 @@ const offersWrap = document.querySelector("#offers-wrap");
 const offersList = document.querySelector("#offers-list");
 const offersCaption = document.querySelector("#offers-caption");
 const moreButton = document.querySelector("#load-more-button");
+const results = document.querySelector("#results");
+const providerDetails = document.querySelector("#provider-details");
+const loading = document.querySelector("#search-loading");
+const searchGuide = document.querySelector("#search-guide");
 let savedResponse = null;
 const SEARCH_STATE_KEY = "multimarket.search.v1";
 let activeQuery = "";
@@ -28,11 +32,11 @@ const providerMeta = {
   "Яндекс Маркет": { logo: "Я", className: "ym-logo" }
 };
 const statusMeta = {
-  access_required: { label: "Нужен источник", className: "status-warn" },
+  access_required: { label: "Поиск недоступен", className: "status-warn" },
   disabled: { label: "Временно выключен", className: "status-neutral" },
   policy_restricted: { label: "Доступ ограничен", className: "status-warn" },
-  ready: { label: "Есть карточки", className: "status-good" },
-  no_results: { label: "Нет карточек", className: "status-warn" },
+  ready: { label: "Товары найдены", className: "status-good" },
+  no_results: { label: "Товары не найдены", className: "status-neutral" },
   error: { label: "Ошибка запроса", className: "status-error" }
 };
 
@@ -60,6 +64,7 @@ function money(value, currency) {
 }
 function renderProviders(providers) {
   providerGrid.replaceChildren();
+  providerDetails.hidden = !providers?.length;
   for (const provider of providers || []) {
     const meta = providerMeta[provider.marketplace] || { logo: "?", className: "" };
     const info = statusMeta[provider.status] || statusMeta.error;
@@ -78,7 +83,7 @@ function renderProviders(providers) {
       links.append(link);
     }
     if (provider.status === "policy_restricted" || provider.status === "access_required") {
-      const setup = element("a", "provider-setup", "Как подключить источник");
+      const setup = element("a", "provider-setup", "Почему поиск недоступен");
       setup.href = "/sources";
       links.append(setup);
     }
@@ -95,6 +100,7 @@ function renderOffers(products, query, append) {
   }
   if (!products.length && !append) {
     offersWrap.hidden = true;
+    count.textContent = "";
     return 0;
   }
   offersWrap.hidden = false;
@@ -116,9 +122,8 @@ function renderOffers(products, query, append) {
       image.referrerPolicy = "no-referrer";
       head.append(image);
     }
-    head.append(element("h3", "", product.title || "Товар"));
     card.append(head);
-    const productPage = element("a", "details-button", "Подробнее о товаре →");
+    const productPage = element("a", "details-button", product.title || "Товар");
     const productSummary = {
       title: product.title || "Товар",
       offers: offers.map(offer => ({
@@ -133,7 +138,9 @@ function renderOffers(products, query, append) {
       }))
     };
     productPage.href = "/product?data=" + encodeURIComponent(JSON.stringify(productSummary));
-    card.append(productPage);
+    const productHeading = element("h3");
+    productHeading.append(productPage);
+    head.append(productHeading);
     const rows = element("div", "offer-rows");
     const minima = new Map();
     offers.forEach(offer => {
@@ -162,15 +169,16 @@ function renderOffers(products, query, append) {
       const right = element("div", "offer-right");
       right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
       const actions = element("div", "offer-actions");
-      const link = element("a", "offer-open", "К товару ↗");
+      const link = element("a", "offer-open", "В магазин ↗");
       link.href = offer.url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       actions.append(link);
-      const watch = element("button", "watch-button", "Следить");
+      const watch = element("button", "watch-button", "Следить за ценой");
       watch.type = "button";
       watch.addEventListener("click", async () => {
         watch.disabled = true;
+        watch.textContent = "Добавляем…";
         try {
           const authResponse = await fetch("/api/auth/me");
           if (!authResponse.ok) throw new Error("Не удалось проверить вход.");
@@ -190,9 +198,11 @@ function renderOffers(products, query, append) {
           });
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || "Не удалось добавить товар.");
-          watch.textContent = "Добавлен";
+          watch.textContent = "Отслеживается";
+          message(notice, "Товар добавлен. Его цена и история доступны в разделе «Мои товары».");
         } catch (error) {
           watch.disabled = false;
+          watch.textContent = "Следить за ценой";
           message(notice, error.message);
         }
       });
@@ -206,8 +216,8 @@ function renderOffers(products, query, append) {
     productCount += 1;
     renderedCount += 1;
   }
-  offersCaption.textContent = productCount + " товаров · " + offerCount + " предложений";
-  count.textContent = productCount + " товаров";
+  offersCaption.textContent = "Предложений: " + offerCount + ". Итоговую цену проверьте в магазине.";
+  count.textContent = "Показано " + productCount + " из " + bufferedProducts.length;
   return renderedCount;
 }
 function updateMoreButton() {
@@ -253,13 +263,14 @@ async function fetchSearchResults(sequence = searchSequence) {
   renderOffers(firstBatch, activeQuery, false);
   displayedProductCount = firstBatch.length;
   emptyState.hidden = Boolean(bufferedProducts.length);
+  providerDetails.open = !bufferedProducts.length;
   if (!bufferedProducts.length) {
     emptyState.querySelector("strong").textContent = "Товары не найдены";
-    emptyState.querySelector("span").textContent = "Открой площадку или подключи разрешённый источник данных.";
+    emptyState.querySelector("span").textContent = "Уточните бренд и модель или откройте поиск на площадке ниже.";
   }
 
   if ((data.total_products ?? 0) >= MAX_BUFFERED_RESULTS && !data.exact_total) {
-    message(notice, "Яндекс Маркет вернул первые 200 доступных карточек. Возможно, у запроса есть следующие страницы.");
+    message(notice, "Показаны первые 200 доступных товаров. Уточните запрос, чтобы найти нужную модель.");
   } else {
     message(notice, data.notice);
   }
@@ -275,6 +286,13 @@ async function runSearch(query) {
   bufferedProducts = [];
   displayedProductCount = 0;
   const sequence = ++searchSequence;
+  results.hidden = false;
+  results.setAttribute("aria-busy", "true");
+  searchGuide.hidden = true;
+  loading.hidden = false;
+  providerDetails.hidden = true;
+  providerDetails.open = false;
+  count.textContent = "";
   input.value = activeQuery;
   button.disabled = true;
   button.textContent = "Ищем…";
@@ -283,19 +301,21 @@ async function runSearch(query) {
   offersWrap.hidden = true;
   moreButton.hidden = true;
   message(notice, "");
-  providerGrid.replaceChildren(element("div", "loading-card", "Ищем до 200 товаров на Яндекс Маркете…"));
   try {
     await fetchSearchResults(sequence);
   } catch (error) {
+    if (sequence !== searchSequence) return;
     providerGrid.replaceChildren();
     title.textContent = "Поиск не выполнен";
     emptyState.hidden = false;
     emptyState.querySelector("strong").textContent = "Не удалось выполнить поиск";
-    emptyState.querySelector("span").textContent = error.message || "Попробуй ещё раз.";
+    emptyState.querySelector("span").textContent = error.message || "Проверьте соединение и попробуйте ещё раз.";
   } finally {
     if (sequence === searchSequence) {
+      loading.hidden = true;
+      results.setAttribute("aria-busy", "false");
       button.disabled = false;
-      button.textContent = "Найти →";
+      button.textContent = "Найти";
     }
   }
 }
@@ -314,6 +334,7 @@ moreButton.addEventListener("click", () => {
   moreButton.disabled = false;
   saveSearchState();
 });
+document.querySelector("#retry-search").addEventListener("click", () => runSearch(activeQuery));
 
 function saveSearchState() {
   if (!savedResponse) return;
@@ -334,10 +355,17 @@ function restoreSearchState() {
     input.value = activeQuery;
     bufferedProducts = state.data.products;
     displayedProductCount = Math.min(Math.max(state.displayed, DISPLAY_BATCH_SIZE), bufferedProducts.length);
+    results.hidden = false;
+    searchGuide.hidden = true;
     title.textContent = "Результаты для «" + activeQuery + "»";
     renderProviders(state.data.providers);
     renderOffers(bufferedProducts.slice(0, displayedProductCount), activeQuery, false);
     emptyState.hidden = Boolean(bufferedProducts.length);
+    providerDetails.open = !bufferedProducts.length;
+    if (!bufferedProducts.length) {
+      emptyState.querySelector("strong").textContent = "Товары не найдены";
+      emptyState.querySelector("span").textContent = "Уточните бренд и модель или откройте поиск на площадке ниже.";
+    }
     message(notice, state.data.notice);
     updateMoreButton();
     requestAnimationFrame(() => window.scrollTo(0, Number(state.scrollY) || 0));

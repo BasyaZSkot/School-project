@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
+  <meta name="theme-color" content="#fafafa">
   <meta name="description" content="Подробности и сравнение предложений товара.">
   <title>Товар — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
@@ -13,17 +13,18 @@
   <script src="/static/product.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="MultiMarket, поиск">
       <img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span>
     </a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
-      <a href="/history">История цен</a><a href="/sources">Источники</a>
+      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
+      <a href="/history">История цен</a>
     </nav>
     <a class="top-action" href="/account">Аккаунт</a>
   </header>
-  <main class="page">
+  <main class="page" id="main-content">
     <a class="back-link" href="/">← Вернуться к поиску</a>
     <section class="product-detail-hero" aria-live="polite">
       <div id="product-image-wrap" class="product-detail-image-wrap" hidden>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
+  <meta name="theme-color" content="#fafafa">
   <title>Аккаунт — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
@@ -12,17 +12,17 @@
   <script src="/static/account.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
     <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
-      <a href="/history">История цен</a><a href="/sources">Источники</a>
+      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
+      <a href="/history">История цен</a>
     </nav>
     <a class="top-action" href="/">К поиску</a>
   </header>
-  <main class="page auth-page">
+  <main class="page auth-page" id="main-content">
     <section class="account-card">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> ЛИЧНЫЙ ПРОФИЛЬ</div>
       <div class="account-profile">
         <img id="account-picture" class="account-picture" alt="" hidden>
         <div><h1 id="account-name">Загружаем профиль…</h1><p id="account-email" class="muted"></p></div>
@@ -33,6 +33,7 @@
         <div><dt>Создан</dt><dd id="account-created"></dd></div>
       </dl>
       <div class="account-actions">
+        <a class="button button-primary" href="/monitoring">Мои товары</a>
         <a id="admin-link" class="button button-secondary" href="/admin" hidden>Открыть админ-панель</a>
         <button id="logout-button" class="button button-danger" type="button">Выйти</button>
       </div>

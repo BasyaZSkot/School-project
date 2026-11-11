@@ -3,28 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
-  <title>Источники данных — MultiMarket</title>
+  <meta name="theme-color" content="#fafafa">
+  <title>О сервисе — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
     <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a href="/monitoring">Мониторинг</a>
-      <a href="/history">История цен</a><a class="active" href="/sources">Источники</a>
+      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
+      <a href="/history">История цен</a>
     </nav>
     <a class="top-action" href="/account">Аккаунт</a>
   </header>
-  <main class="page">
+  <main class="page" id="main-content">
     <section class="page-intro page-intro-compact">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> ПОДКЛЮЧЕНИЯ</div>
-      <h1>Источники данных</h1>
-      <p>Здесь показано, почему площадка может не вернуть карточки и как подключить разрешённый поток данных.</p>
+      <h1>Покупать проще, когда есть выбор</h1>
+      <p>MultiMarket помогает найти товар и следить за его ценой. Покупку вы оформляете в магазине.</p>
     </section>
+    <div class="source-grid">
+      <article class="source-card"><h2>Найдите товар</h2><p>Введите название, бренд или модель. В результатах появятся доступные предложения.</p><a class="button button-secondary" href="/">Перейти к поиску</a></article>
+      <article class="source-card"><h2>Следите за ценой</h2><p>Нажмите «Следить за ценой» и войдите в аккаунт. Сохранённые товары и история будут доступны только вам.</p><a class="button button-secondary" href="/monitoring">Мои товары</a></article>
+      <article class="source-card"><h2>Покупайте в магазине</h2><p>Проверьте итоговую цену, наличие и доставку на площадке перед заказом. Эти условия могут меняться.</p></article>
+    </div>
+    <div class="source-alert"><strong>Если товаров не нашлось</strong><p>Уточните название или модель. Иногда площадка временно недоступна: её статус и ссылка на прямой поиск показаны в разделе «Площадки и доступность» под результатами.</p></div>
+    <details class="source-setup">
+      <summary>Настройка источников для разработчиков</summary>
     <div class="source-alert"><strong>О кодах 403 и 498</strong><p>Это ответ площадки на автоматический запрос. Если сервер не отдаёт страницу с карточками, переписывание извлекателя не создаст реальные товары. Для стабильной выдачи подключи разрешённый API или партнёрский JSON-фид.</p></div>
     <div class="source-grid">
       <article class="source-card"><div class="provider-logo ozon-logo">O</div><h2>Ozon</h2><p>Обычный публичный поиск может быть ограничен. Для фида используй серверные переменные:</p><code>MULTIMARKET_OZON_FEED_URL</code><code>MULTIMARKET_OZON_FEED_TOKEN</code></article>
@@ -40,6 +48,7 @@
       </ol>
       <p>Фид должен принимать параметры q и limit и возвращать массив offers. К каждой записи нужны title, price, currency и ссылка на товар на соответствующей площадке. Подробный пример есть в документации проекта.</p>
     </section>
+    </details>
   </main>
   <footer class="footer"><span>© MultiMarket</span><a href="/">Вернуться к поиску</a></footer>
 </body>
