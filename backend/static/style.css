@@ -343,6 +343,25 @@ summary:hover { color: var(--accent); }
 .spec-search { max-width: 320px; margin: 0 0 14px; background: var(--paper); }
 
 .pickup-preference { display:flex; align-items:center; gap:14px; margin:0 0 20px; font-size:13px; }
+.region-button { text-decoration:none; }
+.delivery-page > .back-link { margin-top:24px; }
+.delivery-page .page-intro { padding:28px 0; }
+.delivery-overview { display:grid; grid-template-columns:minmax(230px,.7fr) minmax(0,1.3fr); gap:24px; margin-bottom:28px; }
+.delivery-city-card, .delivery-saved-card, .pickup-editor { min-width:0; padding:24px; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
+.delivery-overview h2 { margin:0 0 10px; font-size:19px; }
+.delivery-city-card > p { margin:0 0 18px; }
+.delivery-city-card label { display:grid; gap:8px; font-size:13px; }
+.delivery-city-card select { width:100%; min-height:44px; padding:10px 12px; border:1px solid #cacbd3; border-radius:8px; color:var(--ink); background:white; font-size:14px; }
+.delivery-feedback { min-height:20px; margin-top:12px!important; color:var(--accent); font-size:13px; }
+.delivery-saved-list { list-style:none; margin:0; padding:0; }
+.delivery-saved-list li { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:12px 0; border-bottom:1px solid var(--line); }
+.delivery-saved-list li:last-child { border-bottom:0; padding-bottom:0; }
+.delivery-saved-list strong { font-size:14px; font-weight:600; }
+.delivery-saved-list p { margin:4px 0 0; font-size:13px; }
+.delivery-saved-list button { flex-shrink:0; font-size:13px; }
+.pickup-editor { scroll-margin-top:20px; }
+.pickup-editor .pickup-fields { grid-template-columns:minmax(0,340px); }
+.pickup-editor .pickup-footer { position:static; bottom:auto; }
 .pickup-preference > span { max-width:700px; overflow-wrap:anywhere; }
 .pickup-dialog { width:min(1050px,95vw); max-height:92dvh; padding:24px; border:1px solid var(--line); border-radius:16px; color:var(--ink); background:var(--paper); overflow-y:auto; }
 .pickup-dialog::backdrop { background:#17151f70; }
@@ -386,6 +405,8 @@ summary:hover { color: var(--accent); }
 .pickup-footer-actions button { font-size:13px; }
 .pickup-disclaimer { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.6; }
 @media(max-width:700px) {
+  .delivery-overview { grid-template-columns:minmax(0,1fr); gap:16px; }
+  .delivery-city-card, .delivery-saved-card, .pickup-editor { padding:18px; }
   .pickup-preference { align-items:flex-start; flex-direction:column; gap:8px; }
   .pickup-dialog { width:96vw; max-height:94dvh; padding:16px; border-radius:12px; }
   .pickup-header h2 { font-size:21px; }

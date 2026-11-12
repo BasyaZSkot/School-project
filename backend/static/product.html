@@ -23,15 +23,15 @@
       <img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span>
     </a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
+      <a href="/">Поиск</a><a data-delivery-link href="/delivery">Доставка</a><a href="/monitoring">Мои товары</a>
       <a href="/history">История цен</a>
     </nav>
     <a class="top-action" href="/account">Аккаунт</a>
   </header>
   <main class="page" id="main-content">
     <a class="back-link" href="/">← Вернуться к поиску</a>
-    <p class="product-region">Город доставки: <span data-region-label>Регион площадки</span> <a href="/#delivery-region">Изменить</a></p>
-    <div class="pickup-preference"><button class="pickup-open secondary-button" type="button" data-pickup-open aria-haspopup="dialog">Выбрать пункт выдачи</button><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
+    <p class="product-region">Город доставки: <span data-region-label>Регион площадки</span> <a data-delivery-link href="/delivery#city">Изменить</a></p>
+    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery">Выбрать пункт выдачи</a><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
     <section class="product-detail-hero">
       <div id="product-image-wrap" class="product-detail-image-wrap" hidden>
         <button id="gallery-open" class="gallery-main" type="button" aria-label="Увеличить фото товара"><img id="product-image" class="product-detail-image" alt=""></button>

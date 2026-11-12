@@ -178,6 +178,11 @@ async def product_page():
     return FileResponse(STATIC_DIR / "product.html")
 
 
+@app.get("/delivery", include_in_schema=False)
+async def delivery_page():
+    return FileResponse(STATIC_DIR / "delivery.html")
+
+
 @app.get("/login", include_in_schema=False)
 async def login_page():
     return FileResponse(STATIC_DIR / "login.html")

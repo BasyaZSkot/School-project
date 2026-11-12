@@ -24,6 +24,7 @@
     </a>
     <nav class="main-nav" aria-label="Главная навигация">
       <a class="active" aria-current="page" href="/">Поиск</a>
+      <a href="/delivery">Доставка</a>
       <a href="/monitoring">Мои товары</a>
       <a href="/history">История цен</a>
     </nav>
@@ -36,8 +37,8 @@
       <p>Найдите товар, сравните предложения и следите за ценой.</p>
     </section>
 
-    <div class="search-settings" id="delivery-region"><button id="region-open" class="region-button" type="button" aria-haspopup="dialog" disabled>Город доставки: <span data-region-label>Регион площадки</span> <span aria-hidden="true">⌄</span></button><span class="muted">Для расчёта сроков доставки</span></div>
-    <div class="pickup-preference"><button class="pickup-open secondary-button" type="button" data-pickup-open aria-haspopup="dialog">Выбрать пункт выдачи</button><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
+    <div class="search-settings" id="delivery-region"><a class="region-button" data-delivery-link href="/delivery#city">Город доставки: <span data-region-label>Регион площадки</span> <span aria-hidden="true">⌄</span></a><span class="muted">Для расчёта сроков доставки</span></div>
+    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery">Выбрать пункт выдачи</a><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
     <form class="search-form" id="search-form" role="search">
       <label class="sr-only" for="search-input">Название товара</label>
       <svg class="search-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
@@ -96,7 +97,6 @@
       </details>
     </section>
   </main>
-  <dialog id="region-dialog" class="region-dialog" aria-labelledby="region-title"><div class="region-dialog-heading"><h2 id="region-title">Город доставки</h2><button id="region-close" class="button button-secondary" type="button" aria-label="Закрыть выбор города">✕</button></div><p class="muted">Выбор сохраняется в этом браузере. После смены города поиск обновится.</p><label class="sr-only" for="region-search">Найти город</label><input id="region-search" class="detail-input" type="search" placeholder="Начните вводить город" autocomplete="off"><button id="region-auto" class="region-option region-auto" type="button">Регион площадки автоматически</button><ul id="region-list" class="region-list" aria-label="Города"></ul><p id="region-feedback" class="muted" role="status"></p></dialog>
   <footer class="footer"><span>© MultiMarket</span><a href="/sources">О сервисе</a></footer>
 </body>
 </html>

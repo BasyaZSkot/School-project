@@ -6,8 +6,16 @@
   let city=null, market=D.markets[0], points=[], candidate=null, suggestions=[], active=-1, limit=20;
   let pointSequence=0, suggestSequence=0, pointAbort, suggestAbort, timer, map, origin, mapPromise, mapConfig={};
   let mapMode=!matchMedia("(max-width: 700px)").matches;
-  const dialog=node("dialog",undefined,"pickup-dialog"); dialog.id="pickup-dialog";dialog.setAttribute("aria-labelledby","pickup-title");
-  dialog.innerHTML=`<div class="pickup-header"><div><p class="eyebrow">Доставка</p><h2 id="pickup-title">Выберите пункт выдачи</h2></div><button id="pickup-close" type="button" class="secondary-button" aria-label="Закрыть выбор пункта выдачи">✕</button></div>
+  const host=$("#pickup-page");
+  if(!host){
+    Region.ready.then(updateSummary);document.addEventListener("multimarket:regionchange",updateSummary);
+    $("#product-source")?.addEventListener("change",updateSummary);
+    window.addEventListener("storage",e=>{if(e.key===D.KEY)updateSummary();});
+    window.MultiMarketPickup={refresh:updateSummary,open:market=>location.assign(deliveryUrl(market))};
+    return;
+  }
+  const editor=node("section",undefined,"pickup-editor");editor.id="pickup-editor";editor.setAttribute("aria-labelledby","pickup-title");
+  editor.innerHTML=`<div class="pickup-header"><h2 id="pickup-title">Найти пункт выдачи</h2></div>
     <div class="pickup-fields"><label>Город<select id="pickup-city"><option value="">Выберите город</option></select></label><label>Маркетплейс<select id="pickup-market"></select></label></div>
     <div class="pickup-search-wrap"><label for="pickup-address">Адрес или название пункта</label><input id="pickup-address" type="search" maxlength="160" placeholder="Начните вводить улицу и дом" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pickup-suggestions" aria-describedby="pickup-search-help"><ul id="pickup-suggestions" class="pickup-suggestions" role="listbox" aria-label="Подсказки адресов и пунктов выдачи" hidden></ul></div>
     <div class="pickup-view-bar"><p id="pickup-search-help">От 3 букв — адресные подсказки. Выберите адрес, чтобы найти ПВЗ рядом.</p><div class="pickup-view" role="group" aria-label="Способ выбора"><button id="pickup-list-view" type="button">Списком</button><button id="pickup-map-view" type="button">На карте</button></div></div>
@@ -15,19 +23,37 @@
     <div id="pickup-layout" class="pickup-layout"><div class="pickup-results"><ul id="pickup-list" aria-label="Пункты выдачи"></ul><button id="pickup-more" type="button" class="secondary-button" hidden>Показать ещё</button></div><div id="pickup-map-panel" class="pickup-map-panel"><div id="pickup-map" aria-label="Карта пунктов выдачи"></div><button id="pickup-map-search" class="secondary-button pickup-map-search" type="button" disabled>Найти в этой области</button><p id="pickup-map-error" class="pickup-map-error" role="status" hidden></p></div></div>
     <div class="pickup-footer"><div><strong id="pickup-choice">Пункт не выбран</strong><p id="pickup-choice-market" class="muted"></p></div><div class="pickup-footer-actions"><button id="pickup-remove" class="text-button" type="button" hidden>Удалить сохранённый</button><button id="pickup-confirm" type="button" disabled>Выбрать этот пункт</button></div></div>
     <p class="pickup-disclaimer">Выбор сохранится в MultiMarket. Доступность товара и доставку в этот пункт подтвердит маркетплейс при оформлении. Список может быть неполным. Пункты: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>. <span id="pickup-suggest-credit" hidden>Адресные подсказки: <a href="https://yandex.ru/maps/" target="_blank" rel="noopener noreferrer">Яндекс Карты</a>.</span></p>`;
-  document.body.append(dialog);
+  host.append(editor);
+  $("#delivery-city-slot").replaceChildren($("#pickup-city").parentElement);
   document.querySelectorAll(".secondary-button").forEach(b=>{b.classList.remove("secondary-button");b.classList.add("button","button-secondary");});
   $("#pickup-confirm").classList.add("button","button-primary");
   D.markets.forEach(m => $("#pickup-market").append(new Option(m,m)));
   function saved() {return D.read(localStorage)[D.key(city,market)] || null;}
-  function broadcast() {updateSummary();document.dispatchEvent(new CustomEvent("multimarket:pickupchange"));}
+  function broadcast() {updateSummary();renderSaved();document.dispatchEvent(new CustomEvent("multimarket:pickupchange"));}
+  function deliveryUrl(marketplace, hash="") {
+    const url=new URL("/delivery",location.origin);
+    url.searchParams.set("return_to",location.pathname+location.search);
+    if(D.markets.includes(marketplace))url.searchParams.set("marketplace",marketplace);
+    url.hash=hash;return url.pathname+url.search+url.hash;
+  }
   function updateSummary() {
     const id=Region.getEffectiveId();
+    const source=$("#product-source"), selectedMarket=source?.selectedOptions[0]?.textContent;
+    document.querySelectorAll("[data-delivery-link]").forEach(link=>{link.href=deliveryUrl(selectedMarket,new URL(link.href).hash);});
     document.querySelectorAll("[data-pickup-summary]").forEach(el => {
-      const source=$("#product-source");
-      const selectedMarket=source?.selectedOptions[0]?.textContent;
       const choices=Object.values(D.read(localStorage)).filter(p=>p.region_id===id && (!selectedMarket || p.marketplace===selectedMarket));
       el.textContent=choices.length ? choices.map(p=>p.marketplace+": "+p.address).join(" · ") : "Отдельно для каждого маркетплейса";
+    });
+  }
+  function renderSaved() {
+    const list=$("#delivery-saved-list");list.replaceChildren();const choices=D.read(localStorage);
+    D.markets.forEach(m=>{
+      const point=choices[D.key(city,m)],li=node("li"),copy=node("div");
+      copy.append(node("strong",m),node("p",point?.address || (city ? "Пункт пока не выбран" : "Сначала выберите город"),"muted"));
+      const button=node("button",point ? "Изменить" : "Выбрать","text-button");button.type="button";button.disabled=!city;
+      button.setAttribute("aria-label",(point ? "Изменить" : "Выбрать")+" пункт "+m);
+      button.addEventListener("click",()=>{market=m;$("#pickup-market").value=m;$("#pickup-address").value="";loadPoints(point ? {lat:point.lat,lon:point.lon} : null);editor.scrollIntoView({behavior:"smooth",block:"start"});$("#pickup-address").focus({preventScroll:true});});
+      li.append(copy,button);list.append(li);
     });
   }
   function status(text) {$("#pickup-status").textContent=text;}
@@ -68,12 +94,13 @@
   async function loadPoints(center) {
     const sequence=++pointSequence;pointAbort?.abort();pointAbort=new AbortController();candidate=null;points=[];limit=20;
     cancelSuggestions();renderList();drawMarkers();choice();
+    $("#pickup-map-search").disabled=true;
     if(!city){status("Выберите город, чтобы увидеть пункты выдачи.");return;}
-    status("Ищем пункты выдачи…");$("#pickup-map-search").disabled=true;
+    status("Ищем пункты выдачи…");
     const params=new URLSearchParams({region_id:city,marketplace:market});
     if(center){params.set("lat",center.lat);params.set("lon",center.lon);params.set("radius",3);}
     try {
-      const data=await request("/api/pickup-points?"+params,pointAbort.signal);if(sequence!==pointSequence || !dialog.open)return;
+      const data=await request("/api/pickup-points?"+params,pointAbort.signal);if(sequence!==pointSequence)return;
       points=(data.points || []).filter(p=>D.valid(p) && p.region_id===city && p.marketplace===market);origin=data.center;
       const previous=saved();candidate=points.find(p=>p.id===previous?.id) || null;
       status(points.length ? "Найдено пунктов: "+points.length+(data.limited ? ". Уточните адрес или область карты — показаны не все пункты." : ". Выберите удобный.") : "В этой области пунктов не найдено. Попробуйте другой адрес или переместите карту.");
@@ -89,7 +116,7 @@
       try {
         await ensureYandex();
         const result=await window.ymaps.geocode(item.label,{results:1});
-        if(sequence!==suggestSequence || !dialog.open)return;
+        if(sequence!==suggestSequence)return;
         const geo=result.geoObjects.get(0), coords=geo?.geometry.getCoordinates();
         if(!coords)throw new Error("Адрес не найден. Уточните номер дома.");
         item={...item,lat:coords[0],lon:coords[1]};
@@ -104,7 +131,7 @@
       suggestAbort=new AbortController();
       try {
         const data=await request("/api/address-suggestions?"+new URLSearchParams({region_id:city,q}),suggestAbort.signal);
-        if(sequence!==suggestSequence || !dialog.open)return;
+        if(sequence!==suggestSequence)return;
         const local=localSuggestions(q),seen=new Set(local.map(x=>x.label));
         renderSuggestions([...local,...(data.suggestions || []).filter(x=>!seen.has(x.label)).map(x=>({...x,label:String(x.label)}))]);
         if(!suggestions.length)status("Адрес не найден. Уточните улицу и номер дома или воспользуйтесь картой.");
@@ -134,7 +161,7 @@
   async function ensureMap() {
     if(map){map.container.fitToViewport();return;}
     try {
-      await ensureYandex();if(map || !dialog.open || !mapMode)return;
+      await ensureYandex();if(map || !mapMode)return;
       map=new window.ymaps.Map("pickup-map",{center:origin ? [origin.lat,origin.lon] : [55.75,37.62],zoom:13,controls:["zoomControl"]});
       $("#pickup-map-error").hidden=true;
       map.events.add("boundschange",()=>{$("#pickup-map-search").disabled=!city;});drawMarkers();
@@ -145,21 +172,24 @@
     $("#pickup-map-view").setAttribute("aria-pressed",String(mode));$("#pickup-list-view").setAttribute("aria-pressed",String(!mode));
     if(mode && city && origin)ensureMap();
   }
-  async function open(marketplace) {
+  async function open() {
     await Region.ready;const cities=Region.getCities();
-    if(!cities.length)return;
+    if(!cities.length){$("#delivery-city-slot").textContent="Города временно недоступны. Обновите страницу.";status("Не удалось загрузить города.");renderSaved();return;}
     try{mapConfig=await request("/api/map-config");}catch{mapConfig={};}
     $("#pickup-suggest-credit").hidden=!mapConfig.yandex_suggest;
-    $("#pickup-city").replaceChildren(new Option("Выберите город",""),...cities.map(c=>new Option(c.name,c.id)));
-    city=Region.getEffectiveId();market=D.markets.includes(marketplace) ? marketplace : D.markets[0];
+    $("#pickup-city").replaceChildren(new Option("Регион площадки автоматически",""),...cities.map(c=>new Option(c.name,c.id)));
+    const params=new URLSearchParams(location.search),marketplace=params.get("marketplace");
+    city=Region.getId();market=D.markets.includes(marketplace) ? marketplace : D.markets[0];
     $("#pickup-city").value=city || "";$("#pickup-market").value=market;$("#pickup-address").value="";origin=null;
-    dialog.showModal();view(mapMode);$(city ? "#pickup-address" : "#pickup-city").focus();
+    renderSaved();view(mapMode);
+    // Accept return links only to pages that can initiate delivery changes.
+    const target=params.get("return_to");
+    try {const url=new URL(target || "/",location.origin);if(url.origin===location.origin && ["/","/product"].includes(url.pathname))document.querySelectorAll("[data-delivery-back]").forEach(link=>{link.href=url.pathname+url.search;link.textContent=url.pathname==="/product" ? "← Вернуться к товару" : "← Вернуться к поиску";});}catch{}
+    if(location.hash==="#city")$("#pickup-city").focus();
     const previous=saved();await loadPoints(previous ? {lat:previous.lat,lon:previous.lon} : null);
   }
-  document.addEventListener("click",e=> {const b=e.target.closest("[data-pickup-open]");if(b)open(b.dataset.pickupMarket || $("#product-source")?.selectedOptions[0]?.textContent);if(!e.target.closest(".pickup-search-wrap"))closeSuggestions();});
-  $("#pickup-close").addEventListener("click",()=>dialog.close());
-  dialog.addEventListener("close",()=>{pointSequence++;pointAbort?.abort();cancelSuggestions();});
-  $("#pickup-city").addEventListener("change",()=>{city=Number($("#pickup-city").value)||null;origin=null;$("#pickup-address").value="";loadPoints();});
+  document.addEventListener("click",e=> {if(!e.target.closest(".pickup-search-wrap"))closeSuggestions();});
+  $("#pickup-city").addEventListener("change",()=>Region.select(Number($("#pickup-city").value)||null));
   $("#pickup-market").addEventListener("change",()=>{market=$("#pickup-market").value;$("#pickup-address").value="";loadPoints(origin);});
   $("#pickup-address").addEventListener("input",addressInput);
   $("#pickup-address").addEventListener("keydown",e=> {
@@ -173,13 +203,13 @@
   $("#pickup-confirm").addEventListener("click",()=> {
     if(!candidate)return;
     try {D.save(localStorage,candidate);}catch {status("Не удалось сохранить выбор. Разрешите сохранение данных в браузере и повторите.");return;}
-    const id=city;dialog.close();Region.select(id);broadcast();
+    Region.select(city);choice();broadcast();status("Пункт выдачи сохранён. Можно выбрать пункт другой площадки или вернуться к покупкам.");
   });
   $("#pickup-remove").addEventListener("click",()=> {
     try {D.remove(localStorage,city,market);}catch{status("Не удалось удалить сохранённый пункт.");return;}
     candidate=null;choice();renderList();drawMarkers();broadcast();status("Сохранённый пункт удалён.");
   });
-  document.addEventListener("multimarket:regionchange",updateSummary);$("#product-source")?.addEventListener("change",updateSummary);
-  window.addEventListener("storage",e=>{if(e.key===D.KEY){updateSummary();if(dialog.open){choice();renderList();drawMarkers();}}});
-  Region.ready.then(updateSummary);window.MultiMarketPickup={open,refresh:updateSummary};
+  document.addEventListener("multimarket:regionchange",()=>{city=Region.getId();$("#pickup-city").value=city || "";origin=null;$("#pickup-address").value="";$("#delivery-city-status").textContent="Город сохранён.";renderSaved();const previous=saved();loadPoints(previous ? {lat:previous.lat,lon:previous.lon} : null);});
+  window.addEventListener("storage",e=>{if(e.key===D.KEY){renderSaved();choice();renderList();drawMarkers();}});
+  open();window.MultiMarketPickup={refresh:renderSaved};
 })();
