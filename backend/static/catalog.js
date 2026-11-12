@@ -17,6 +17,7 @@
   function todayDay(today) { return Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())/86400000; }
   function deliveryDays(offer, today = new Date()) {
     const d = offer.delivery || {};
+    if (d.region_confirmed === false) return Infinity;
     if (d.partial) return Infinity;
     if (d.latest_date) {
       const end = dateDay(d.latest_date);
@@ -28,6 +29,7 @@
   }
   function hasDeliveryEstimate(offer, today = new Date()) {
     const d = offer.delivery || {};
+    if (d.region_confirmed === false) return false;
     if (d.partial) return false;
     if (d.latest_date) return deliveryDays(offer,today) !== Infinity;
     const start = dateDay(d.earliest_date);
@@ -35,6 +37,7 @@
   }
   function deliveryLabel(offer, today = new Date()) {
     const d = offer.delivery || {};
+    if (d.region_confirmed === false) return "Доставка в выбранный город: уточните в магазине" + (d.destination ? " · " + d.destination : "");
     let text = "Срок уточните в магазине";
     const format = value => new Date(value + "T00:00:00Z").toLocaleDateString("ru-RU", {day:"numeric",month:"long",timeZone:"UTC"});
     if (d.latest_date) {

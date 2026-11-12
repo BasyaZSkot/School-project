@@ -11,6 +11,7 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/catalog.js" defer></script>
+  <script src="/static/region.js" defer></script>
   <script src="/static/product.js" defer></script>
 </head>
 <body>
@@ -27,6 +28,7 @@
   </header>
   <main class="page" id="main-content">
     <a class="back-link" href="/">← Вернуться к поиску</a>
+    <p class="product-region">Город доставки: <span data-region-label>Регион площадки</span> <a href="/#delivery-region">Изменить</a></p>
     <section class="product-detail-hero">
       <div id="product-image-wrap" class="product-detail-image-wrap" hidden>
         <button id="gallery-open" class="gallery-main" type="button" aria-label="Увеличить фото товара"><img id="product-image" class="product-detail-image" alt=""></button>
@@ -49,18 +51,23 @@
     </section>
 
     <div class="product-source-toolbar" id="product-source-toolbar" hidden><label for="product-source">Сведения с площадки</label><select id="product-source"></select><span class="muted">Фото, характеристики и отзывы выбранного магазина</span></div>
-    <div class="product-detail-columns" id="product-details">
-      <section class="product-detail-section detail-panel">
-        <div class="section-kicker">О ТОВАРЕ</div><h2>Описание</h2>
-        <p id="product-description" class="detail-body">Загрузка…</p>
-      </section>
-      <section class="product-detail-section detail-panel">
-        <div class="section-kicker">ХАРАКТЕРИСТИКИ</div><h2>Параметры товара</h2>
-        <label class="sr-only" for="spec-search">Найти характеристику</label><input id="spec-search" class="detail-input" type="search" placeholder="Найти характеристику">
-        <dl id="product-specs" class="detail-specs"></dl>
-        <button id="spec-more" class="text-button" type="button" aria-expanded="false" hidden>Все характеристики</button>
-      </section>
-    </div>
+    <section class="product-about" id="product-details" aria-labelledby="about-title">
+      <h2 id="about-title">О товаре</h2>
+      <div class="product-about-content">
+        <div class="about-tabs" role="tablist" aria-label="Сведения о товаре">
+          <button id="about-description-tab" type="button" role="tab" aria-selected="false" aria-controls="about-description-panel" tabindex="-1">Описание</button>
+          <button id="about-specs-tab" class="active" type="button" role="tab" aria-selected="true" aria-controls="about-specs-panel">Характеристики</button>
+        </div>
+        <div id="about-description-panel" class="about-panel" role="tabpanel" aria-labelledby="about-description-tab" tabindex="0" hidden>
+          <p id="product-description" class="detail-body">Загрузка…</p>
+        </div>
+        <div id="about-specs-panel" class="about-panel" role="tabpanel" aria-labelledby="about-specs-tab" tabindex="0">
+          <label class="sr-only" for="spec-search">Найти характеристику</label><input id="spec-search" class="detail-input spec-search" type="search" placeholder="Найти характеристику">
+          <dl id="product-specs" class="detail-specs product-spec-table"></dl>
+          <button id="spec-more" class="button button-secondary" type="button" aria-controls="product-specs" aria-expanded="false" hidden>Все характеристики</button>
+        </div>
+      </div>
+    </section>
 
     <section class="product-detail-section detail-panel" id="product-review-section">
       <div class="section-kicker">ОТЗЫВЫ</div><h2>Оценки и отзывы покупателей</h2>

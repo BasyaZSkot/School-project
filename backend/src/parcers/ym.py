@@ -9,6 +9,8 @@ from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter, _price_from_offer
 from .product_data import MAX_SPECIFICATIONS, delivery_data, image_urls
 from .yandex_delivery import extract_yandex_deliveries
+from .regions import regional_url
+from .yandex_about import extract_yandex_about
 
 
 MAX_SEARCH_PAGES = 50
@@ -433,7 +435,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
 
         clean_query = " ".join(query.split())
-        search_url = self.search_url.format(query=quote_plus(clean_query))
+        search_url = regional_url(self.search_url.format(query=quote_plus(clean_query)))
         final_url, html = await self._fetch_public_page(search_url)
         if self._is_challenge_page(final_url, html):
             return ProviderResult(
@@ -511,6 +513,8 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
         parser.feed(html)
         parser.close()
         _, primary_delivery = extract_yandex_deliveries(html)
+        about = extract_yandex_about(html)
+        parser.specifications = _merge_specifications(about["specifications"], parser.specifications)
         titles = parser.values.get("productCardTitle", [])
         current_prices = parser.values.get("snippet-price-current", [])
         title = titles[0] if titles else None
@@ -529,6 +533,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             if not structured.delivery and parser.values.get("delivery"):
                 structured.delivery = delivery_data(parser.values["delivery"][0])
             structured.delivery = {**structured.delivery, **primary_delivery}
+            structured.description = about["description"] or structured.description
         if not title or price is None:
             return structured
         product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
@@ -551,6 +556,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             offer.delivery = structured.delivery
         else:
             offer.specifications = parser.specifications
+            offer.description = about["description"]
             offer.image_urls = image_urls(parser.images, page_url)
             offer.image_url = next(iter(offer.image_urls), None)
             offer.delivery = primary_delivery or delivery_data(parser.values.get("delivery", [None])[0])

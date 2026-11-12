@@ -20,6 +20,7 @@ from .ozon import OzonAdapter
 from .transport import BlockedError
 from .wb import WildberriesAdapter
 from .ym import YandexMarketAdapter
+from .regions import region_scope, regional_delivery, regional_url
 
 # How many raw offers we are willing to request from one provider for one
 # search call. Ozon/WB only ever fetch a single public page regardless of
@@ -105,7 +106,14 @@ class MarketplaceSearchService:
                 merged.append(offer)
         return merged
 
-    async def parse_product(self, marketplace: str, product_url: str) -> Offer | None:
+    async def parse_product(self, marketplace: str, product_url: str, region_id: int | None = None) -> Offer | None:
+        with region_scope(region_id):
+            offer = await self._parse_product(marketplace, product_url)
+            if offer is not None:
+                offer.delivery = regional_delivery(offer.delivery)
+            return offer
+
+    async def _parse_product(self, marketplace: str, product_url: str) -> Offer | None:
         adapter = next(
             (item for item in self.adapters if item.marketplace == marketplace),
             None,
@@ -119,6 +127,27 @@ class MarketplaceSearchService:
         return await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
 
     async def search(
+        self, query: str, limit: int = 20, offset: int = 0,
+        session_id: str | None = None, region_id: int | None = None,
+    ) -> dict:
+        with region_scope(region_id) as region:
+            cache_id = f"{session_id}:region:{region_id}" if session_id and region else session_id
+            result = await self._search(query, limit, offset, session_id=cache_id)
+            result["region"] = region
+            unconfirmed = False
+            for product in result["products"]:
+                for offer in product["offers"]:
+                    offer["delivery"] = regional_delivery(offer.get("delivery"))
+                    offer["url"] = regional_url(offer["url"])
+                    unconfirmed |= offer["delivery"].get("region_confirmed") is False
+            for provider in result["providers"]:
+                if provider.get("search_url"):
+                    provider["search_url"] = regional_url(provider["search_url"])
+            if unconfirmed:
+                result["notice"] = f"Площадка не подтвердила город «{region['name']}». Сроки доставки для него уточняются в магазине."
+            return result
+
+    async def _search(
         self, query: str, limit: int = 20, offset: int = 0,
         session_id: str | None = None,
     ) -> dict:

@@ -19,6 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import accounts, monitoring, oauth
 from .service import MarketplaceSearchService, PROVIDER_FETCH_CAP
+from .regions import REGIONS, get_region
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 STATIC_DIR = BACKEND_DIR / "static"
@@ -357,14 +358,23 @@ async def update_user_role(user_id: str, payload: AdminRoleUpdate, request: Requ
     return accounts.set_role(user_id, payload.role)
 
 
+@app.get("/api/regions")
+async def regions():
+    return {"regions": REGIONS}
+
+
 @app.get("/api/search")
 async def search(
     q: str = Query(min_length=1, max_length=160, description="Название товара"),
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=PROVIDER_FETCH_CAP * 3),
     session_id: str | None = Query(default=None, min_length=8, max_length=80),
+    region_id: int | None = Query(default=None, ge=1, le=1000000),
 ):
     try:
+        if region_id is not None:
+            get_region(region_id)
+            return await search_service.search(q, limit, offset, session_id=session_id, region_id=region_id)
         if session_id:
             return await search_service.search(q, limit, offset, session_id=session_id)
         return await search_service.search(q, limit, offset)
@@ -376,7 +386,12 @@ async def search(
 async def product_details(
     marketplace: str = Query(min_length=1, max_length=80),
     product_url: str = Query(min_length=10, max_length=2048),
+    region_id: int | None = Query(default=None, ge=1, le=1000000),
 ):
+    try:
+        get_region(region_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     allowed_domains = MARKETPLACE_DOMAINS.get(marketplace)
     parsed = urlparse(product_url)
     try:
@@ -400,7 +415,7 @@ async def product_details(
             detail="Ссылка должна вести на HTTPS-карточку выбранного маркетплейса",
         )
     try:
-        offer = await search_service.parse_product(marketplace, product_url)
+        offer = await search_service.parse_product(marketplace, product_url, region_id=region_id) if region_id is not None else await search_service.parse_product(marketplace, product_url)
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Карточка не ответила вовремя") from exc
     except ValueError as exc:

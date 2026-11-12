@@ -18,7 +18,7 @@ def _zone_data(attrs):
     return value if isinstance(value, dict) else {}
 
 
-def _normalize(options, destination, reference_date=None):
+def _normalize(options, destination, reference_date=None, region_id=None):
     normalized = []
     for option in options:
         data = option["data"]
@@ -34,6 +34,8 @@ def _normalize(options, destination, reference_date=None):
             "method": {"PICKUP": "Пункт выдачи", "ON_DEMAND": "По клику"}.get(data.get("deliveryType")),
         }
         delivery = delivery_data(raw, reference_date=reference_date)
+        if region_id is not None:
+            delivery["region_id"] = region_id
         if delivery:
             normalized.append((data.get("selected") is True, delivery))
     # A selected delivery method takes precedence. Do not combine one method's
@@ -53,6 +55,7 @@ class _DeliveryParser(HTMLParser):
         self.primary_depth = None
         self.primary = []
         self.destination = ""
+        self.region_id = None
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
@@ -65,6 +68,9 @@ class _DeliveryParser(HTMLParser):
         if auto == "snippet-delivery-options" and self.card is None:
             self.primary_depth = depth
         if zone == "deliveryPoint":
+            region = _zone_data(attrs).get("regionId")
+            if isinstance(region, int) and not isinstance(region, bool):
+                self.region_id = region
             self.captures.append({"depth": depth, "parts": [], "destination": True})
         option = None
         if self.card is not None:
@@ -115,6 +121,6 @@ def extract_yandex_deliveries(html, *, reference_date=None):
     parser = _DeliveryParser()
     parser.feed(html)
     parser.close()
-    by_path = {card["path"]: _normalize(card["options"], parser.destination, reference_date)
+    by_path = {card["path"]: _normalize(card["options"], parser.destination, reference_date, parser.region_id)
                for card in parser.cards if card["path"]}
-    return by_path, _normalize(parser.primary, parser.destination, reference_date)
+    return by_path, _normalize(parser.primary, parser.destination, reference_date, parser.region_id)

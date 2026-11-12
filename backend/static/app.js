@@ -15,6 +15,7 @@ const providerDetails = document.querySelector("#provider-details");
 const loading = document.querySelector("#search-loading");
 const searchGuide = document.querySelector("#search-guide");
 const Catalog = window.MultiMarketCatalog;
+const Region = window.MultiMarketRegion;
 const filterForm = document.querySelector("#catalog-filters");
 let filteredProducts = [];
 let savedResponse = null;
@@ -129,6 +130,7 @@ function renderOffers(products, query, append) {
     const productPage = element("a", "details-button", product.title || "Товар");
     const productSummary = {
       title: product.title || "Товар",
+      region_id: Region.getId(),
       offers: (product.sourceOffers || offers).map(offer => ({
         marketplace: offer.marketplace,
         title: offer.title,
@@ -146,8 +148,9 @@ function renderOffers(products, query, append) {
     };
     const storageKey = "multimarket.product." + (globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2));
     productPage.href = "/product?data=" + encodeURIComponent(JSON.stringify(productSummary)) + "&key=" + encodeURIComponent(storageKey);
+    if (Region.getId() !== null) productPage.href += "&region_id=" + Region.getId();
     const saveProduct = () => {
-      try { sessionStorage.setItem(storageKey, JSON.stringify({title:product.title, offers:product.sourceOffers || offers})); } catch {}
+      try { sessionStorage.setItem(storageKey, JSON.stringify({title:product.title, offers:product.sourceOffers || offers,region_id:Region.getId()})); } catch {}
     };
     productPage.addEventListener("click", saveProduct);
     productPage.addEventListener("auxclick", saveProduct);
@@ -320,6 +323,7 @@ async function fetchSearchResults(sequence = searchSequence) {
     limit: String(MAX_BUFFERED_RESULTS),
     offset: "0"
   });
+  if (Region.getId() !== null) params.set("region_id",String(Region.getId()));
   const response = await fetch("/api/search?" + params, {
     headers: { Accept: "application/json" }
   });
@@ -329,6 +333,7 @@ async function fetchSearchResults(sequence = searchSequence) {
 
   savedResponse = data;
   bufferedProducts = Array.isArray(data.products) ? data.products : [];
+  Region.observeOffers(bufferedProducts.flatMap(p => p.offers || []));
   displayedProductCount = 0;
   title.textContent = "Результаты для «" + data.query + "»";
   renderProviders(data.providers);
@@ -351,6 +356,7 @@ async function fetchSearchResults(sequence = searchSequence) {
   return data;
 }
 async function runSearch(query) {
+  await Region.ready;
   activeQuery = query.trim();
   if (!activeQuery) return;
   savedResponse = null;
@@ -413,9 +419,10 @@ document.querySelector("#retry-search").addEventListener("click", () => buffered
 
 function saveSearchState() {
   if (!savedResponse) return;
+  if ((savedResponse.region?.id ?? null) !== Region.getId()) return;
   try {
     sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-      version: 2, query: activeQuery, data: savedResponse,
+      version: 3, query: activeQuery, data: savedResponse, region_id:Region.getId(),
       displayed: displayedProductCount, scrollY: window.scrollY, filters:readFilters()
     }));
   } catch { /* Browsing also works when storage is unavailable or full. */ }
@@ -423,9 +430,9 @@ function saveSearchState() {
 function restoreSearchState() {
   try {
     const state = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || "null");
-    if (!state || ![1,2].includes(state.version) || typeof state.query !== "string" ||
+    if (!state || ![1,2,3].includes(state.version) || typeof state.query !== "string" ||
         !Array.isArray(state.data?.products) || !Number.isInteger(state.displayed)) return;
-    if (state.version === 1) {
+    if (state.version < 3 || (state.region_id ?? null) !== Region.getId()) {
       runSearch(state.query).then(() => {
         if (savedResponse) {populateFilters(state.filters); applyFilters(state.displayed);}
       });
@@ -435,6 +442,7 @@ function restoreSearchState() {
     activeQuery = state.query;
     input.value = activeQuery;
     bufferedProducts = state.data.products;
+    Region.observeOffers(bufferedProducts.flatMap(p => p.offers || []));
     results.hidden = false;
     searchGuide.hidden = true;
     title.textContent = "Результаты для «" + activeQuery + "»";
@@ -455,4 +463,9 @@ window.addEventListener("pagehide", saveSearchState);
 document.addEventListener("click", event => {
   if (event.target.closest("a")) saveSearchState();
 });
-restoreSearchState();
+document.addEventListener("multimarket:regionchange", () => {
+  if (!activeQuery) return;
+  const filters = readFilters(), requestedRegion = Region.getId();
+  runSearch(activeQuery).then(() => {if (savedResponse && Region.getId() === requestedRegion) {populateFilters(filters);applyFilters();}});
+});
+Region.ready.then(restoreSearchState);

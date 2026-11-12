@@ -85,3 +85,10 @@ test('relative wording from yesterday is displayed as its actual date', () => {
 test('invalid ISO dates are rejected instead of overflowing into a later month', () => {
   assert.equal(C.deliveryDays(offer({delivery:{latest_date:'2027-02-31'}}),new Date(2027,1,1)),Infinity);
 });
+test('a selected city never uses an unconfirmed city delivery date', () => {
+  const o=offer({delivery:{destination:'Москва',region_confirmed:false,max_days:1,latest_date:futureDate(1)}});
+  assert.equal(C.deliveryDays(o),Infinity);
+  assert.equal(C.filterProducts([{offers:[o]}],{delivery:'known'}).length,0);
+  assert.match(C.deliveryLabel(o),/уточните/);
+  assert.doesNotMatch(C.deliveryLabel(o),/ноября/);
+});

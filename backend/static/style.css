@@ -332,3 +332,50 @@ summary:hover { color: var(--accent); }
   .review-toolbar label { flex: 1; min-width: 120px; }
   .catalog-filters { padding: 16px; }
 }
+
+.product-about { display: grid; grid-template-columns: 190px minmax(0,1fr); gap: 32px; margin: 40px 0; padding: 28px 0; border-top: 1px solid var(--line); }
+.product-about > h2 { margin: 10px 0 0; font-size: 22px; }
+.product-about-content { min-width: 0; }
+.about-tabs { display: flex; gap: 24px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.about-tabs button { min-height: 46px; margin-bottom: -1px; padding: 9px 0; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: none; font-size: 14px; }
+.about-tabs button.active { border-bottom-color: var(--ink); color: var(--ink); font-weight: 600; }
+.about-panel { padding: 0 0 8px; }
+.spec-search { max-width: 320px; margin: 0 0 14px; background: var(--paper); }
+.product-spec-table { grid-template-columns: minmax(0,1fr) minmax(140px,.8fr); column-gap: 10px; margin-bottom: 20px; }
+.product-spec-table dt, .product-spec-table dd { padding: 7px 0; border: 0; line-height: 1.5; }
+.product-spec-table dt { display: flex; align-items: baseline; gap: 8px; }
+.product-spec-table dt::after { content: ""; flex: 1; min-width: 12px; border-bottom: 1px solid var(--line); }
+.product-spec-table dd { color: var(--ink); text-align: right; }
+.product-spec-table .detail-muted { text-align: left; }
+@media (max-width: 760px) {
+  .product-about { grid-template-columns: minmax(0,1fr); gap: 12px; margin: 28px 0; padding: 24px 0; }
+  .product-about > h2 { margin: 0; }
+  .product-spec-table { grid-template-columns: minmax(0,1fr) minmax(0,.85fr); }
+  .product-spec-table dt, .product-spec-table dd { font-size: 13px; }
+  .spec-search { max-width: 100%; }
+}
+
+.search-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; width: min(100%,740px); margin: 0 auto 12px; }
+.search-settings > .muted { font-size: 13px; }
+.region-button { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 7px; min-height: 44px; padding: 8px 0; border: 0; color: var(--muted); background: none; font-size: 14px; }
+.region-button [data-region-label] { color: var(--accent); font-weight: 600; }
+.region-dialog { width: min(520px,calc(100vw - 32px)); max-height: min(720px,90vh); padding: 24px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--paper); }
+.region-dialog::backdrop { background: #15151d70; }
+.region-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.region-dialog-heading h2 { margin: 0; }
+.region-dialog .detail-input { font-size: 16px; }
+.region-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; max-height: 330px; overflow-y: auto; margin: 12px 0; padding: 0; list-style: none; }
+.region-option { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid transparent; border-radius: 7px; color: var(--ink); background: none; font-size: 14px; text-align: left; }
+.region-option:hover { background: var(--soft); }
+.region-option[aria-pressed=true] { border-color: #c9c5f4; color: var(--accent); background: var(--soft); }
+.region-auto { border-bottom-color: var(--line); }
+.product-region { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.product-region a { color: var(--accent); }
+@media (max-width: 480px) { .region-dialog { padding: 20px; } .region-list { grid-template-columns: minmax(0,1fr); } .search-settings { gap: 0; } }
+
+.product-spec-table { display: block; }
+.product-spec-table .spec-row { display: flex; align-items: baseline; gap: 8px; }
+.product-spec-table .spec-row::after { content: ""; order: 1; flex: 1; min-width: 12px; border-bottom: 1px solid var(--line); }
+.product-spec-table dt { display: block; flex: 0 1 auto; max-width: 62%; min-width: 0; }
+.product-spec-table dt::after { content: none; }
+.product-spec-table dd { order: 2; flex: 0 1 auto; max-width: 48%; min-width: 0; }

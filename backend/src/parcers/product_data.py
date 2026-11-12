@@ -98,6 +98,9 @@ def delivery_data(value, *, reference_date: date | None = None) -> dict:
     if not isinstance(value, dict):
         return {}
     result = {}
+    region_id = value.get("region_id")
+    if isinstance(region_id, int) and not isinstance(region_id, bool) and 0 < region_id <= 1000000:
+        result["region_id"] = region_id
     if value.get("partial") is True:
         result["partial"] = True
     for key in ("text", "destination", "method"):

@@ -1,4 +1,5 @@
 const Catalog = window.MultiMarketCatalog;
+const Region = window.MultiMarketRegion;
 const marketplaceHosts = { Ozon:["ozon.ru"], Wildberries:["wildberries.ru","wildberries.by","wildberries.kz"], "Яндекс Маркет":["market.yandex.ru"] };
 const $ = selector => document.querySelector(selector);
 let sources = [], selectedSource = 0, galleryImages = [], imageIndex = 0;
@@ -71,14 +72,19 @@ function showGallery(offer) {
   showImage(0);
 }
 function showSpecs() {
+  $("#spec-search").hidden = !specsExpanded;
   const term = $("#spec-search").value.trim().toLocaleLowerCase("ru");
   const items = (sources[selectedSource]?.specifications || []).filter(s => s?.name && s?.value).slice(0,100);
   const matches = items.filter(s => (s.name + " " + s.value).toLocaleLowerCase("ru").includes(term));
-  const visible = term || specsExpanded ? matches : matches.slice(0,8);
+  const visible = term || specsExpanded ? matches : matches.slice(0,10);
   $("#product-specs").replaceChildren();
-  visible.forEach(s => $("#product-specs").append(element("dt","",s.name), element("dd","",s.value)));
+  visible.forEach(s => {
+    const row = element("div","spec-row");
+    row.append(element("dt","",s.name),element("dd","",s.value));
+    $("#product-specs").append(row);
+  });
   if (!matches.length) $("#product-specs").append(element("dd","detail-muted",term ? "Такая характеристика не найдена." : "Магазин не передал характеристики."));
-  $("#spec-more").hidden = Boolean(term) || items.length <= 8;
+  $("#spec-more").hidden = items.length <= 10;
   $("#spec-more").textContent = specsExpanded ? "Свернуть характеристики" : "Все характеристики (" + items.length + ")";
   $("#spec-more").setAttribute("aria-expanded", String(specsExpanded));
 }
@@ -191,7 +197,8 @@ async function loadProduct() {
     $("#product-status").textContent = "Вернитесь к поиску и откройте товар из результатов.";
     $("#product-description").textContent = "Нет данных."; showSpecs(); showReviews(); return;
   }
-  sources = product.offers;
+  sources = product.offers.map(o => ({...o,delivery:Region.scopeDelivery(o.delivery)}));
+  Region.observeOffers(sources);
   document.title = product.title + " — MultiMarket"; $("#product-title").textContent = product.title;
   [...new Set(sources.map(o => o.marketplace))].forEach(m => $("#product-marketplaces").append(element("span","marketplace-chip",m)));
   const richness = o => Catalog.images(o).length + (o.specifications?.length || 0) + (o.reviews?.length || 0) + (o.description ? 1 : 0);
@@ -202,7 +209,9 @@ async function loadProduct() {
   $("#product-source").addEventListener("change", event => {userSelected = true; showSource(Number(event.target.value));});
   const results = await Promise.all(sources.map(async offer => {
     try {
-      const response = await fetch("/api/product-details?" + new URLSearchParams({marketplace:offer.marketplace,product_url:offer.url}),{headers:{Accept:"application/json"}});
+      const params = new URLSearchParams({marketplace:offer.marketplace,product_url:offer.url});
+      if (Region.getId() !== null) params.set("region_id",String(Region.getId()));
+      const response = await fetch("/api/product-details?" + params,{headers:{Accept:"application/json"}});
       const data = await response.json();
       if (!response.ok || !data.details_available) return null;
       return data;
@@ -219,11 +228,34 @@ async function loadProduct() {
     return next;
   });
   if (!userSelected) selectedSource = sources.reduce((best,o,i) => richness(o) > richness(sources[best]) ? i : best,0);
+  Region.observeOffers(sources);
   renderOffers(); updateSourceSelect(); showSource(selectedSource);
-  $("#product-status").textContent = results.some(Boolean) ? "Сведения обновлены из доступных карточек магазинов." : "Показаны доступные сведения из поиска. Остальные подробности можно уточнить в магазине.";
+  $("#product-status").textContent = sources.some(o => o.delivery?.region_confirmed === false)
+    ? "Магазин не подтвердил выбранный город. Срок доставки уточните в магазине."
+    : results.some(Boolean) ? "Сведения обновлены из доступных карточек магазинов." : "Показаны доступные сведения из поиска. Остальные подробности можно уточнить в магазине.";
 }
 $("#spec-search").addEventListener("input",showSpecs);
-$("#spec-more").addEventListener("click", () => {specsExpanded = !specsExpanded; showSpecs();});
+function selectAboutTab(name, focus = false) {
+  for (const key of ["description", "specs"]) {
+    const active = key === name;
+    const tab = $("#about-" + key + "-tab");
+    tab.setAttribute("aria-selected",String(active));
+    tab.tabIndex = active ? 0 : -1;
+    tab.classList.toggle("active",active);
+    $("#about-" + key + "-panel").hidden = !active;
+    if (active && focus) tab.focus();
+  }
+}
+for (const key of ["description", "specs"]) {
+  $("#about-" + key + "-tab").addEventListener("click",() => selectAboutTab(key));
+  $("#about-" + key + "-tab").addEventListener("keydown",event => {
+    if (["ArrowLeft","ArrowRight","Home","End"].includes(event.key)) {
+      event.preventDefault();
+      selectAboutTab(event.key === "Home" ? "description" : event.key === "End" ? "specs" : key === "specs" ? "description" : "specs",true);
+    }
+  });
+}
+$("#spec-more").addEventListener("click", () => {specsExpanded = !specsExpanded; if (!specsExpanded) $("#spec-search").value=""; showSpecs();});
 $("#review-more").addEventListener("click", () => {reviewLimit += 5; showReviews();});
 for (const id of ["#review-rating","#review-sort"]) $(id).addEventListener("change", () => {reviewLimit=5; showReviews();});
 for (const id of ["#gallery-prev","#gallery-dialog-prev"]) $(id).addEventListener("click", () => showImage(imageIndex-1));
@@ -233,4 +265,5 @@ $("#gallery-close").addEventListener("click", () => $("#gallery-dialog").close()
 for (const id of ["#product-image-wrap","#gallery-dialog"]) $(id).addEventListener("keydown", event => {
   if (event.key === "ArrowLeft" || event.key === "ArrowRight") {event.preventDefault(); showImage(imageIndex+(event.key === "ArrowRight" ? 1 : -1));}
 });
-loadProduct();
+document.addEventListener("multimarket:regionchange", () => location.reload());
+Region.ready.then(loadProduct);

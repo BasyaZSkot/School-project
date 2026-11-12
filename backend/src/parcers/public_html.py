@@ -15,6 +15,7 @@ from urllib.parse import quote_plus, urljoin, urlparse
 from .base import MAX_PROVIDER_LIMIT, Offer, ProviderResult, SearchStatus
 from .transport import ResilientFetcher, get_shared_fetcher
 from .product_data import MAX_REVIEWS, MAX_SPECIFICATIONS, image_urls, schema_delivery
+from .regions import regional_url
 
 
 class _JsonLdParser(HTMLParser):
@@ -351,6 +352,7 @@ class PublicHtmlSearchAdapter:
         return None
 
     async def _fetch_public_page(self, url: str) -> tuple[str, str]:
+        url = regional_url(url)
         fetcher = self._fetcher or get_shared_fetcher()
         page = await fetcher.fetch(url)
         if not self._valid_marketplace_url(page.url, url):

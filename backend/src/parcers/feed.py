@@ -9,6 +9,7 @@ import httpx
 
 from .base import MAX_PROVIDER_LIMIT, DisabledAdapter, Offer, ProviderResult, SearchStatus
 from .product_data import MAX_REVIEWS, MAX_SPECIFICATIONS, delivery_data, image_urls
+from .regions import current_region
 
 
 class JsonFeedAdapter(DisabledAdapter):
@@ -130,9 +131,13 @@ class JsonFeedAdapter(DisabledAdapter):
             headers["Authorization"] = f"Bearer {self.token}"
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
+            params = {"q": query, "limit": limit}
+            region = current_region()
+            if region:
+                params["region_id"] = region["id"]
             response = await client.get(
                 self.feed_url,
-                params={"q": query, "limit": limit},
+                params=params,
                 headers=headers,
             )
             response.raise_for_status()
