@@ -141,6 +141,7 @@ function renderOffers(products, query, append) {
         external_id: offer.external_id,
         in_stock: offer.in_stock,
         brand: offer.brand,
+        model: offer.model, seller:offer.seller, condition:offer.condition, variants:offer.variants,
         rating: offer.rating,
         review_count: offer.review_count,
         delivery: offer.delivery
@@ -157,6 +158,7 @@ function renderOffers(products, query, append) {
     const productHeading = element("h3");
     productHeading.append(productPage);
     head.append(productHeading);
+    card.append(window.MultiMarketLibrary.controls({title:product.title,offers:product.sourceOffers || offers}));
     const rows = element("div", "offer-rows");
     const best = Catalog.bestOffers(offers);
     offers.forEach(offer => {
@@ -164,6 +166,8 @@ function renderOffers(products, query, append) {
       const row = element("div", "offer-row");
       const info = element("div", "offer-info");
       info.append(element("strong", "", offer.marketplace));
+      if(offer.seller)info.append(element("span","","Продавец: "+offer.seller));
+      if(Object.keys(offer.variants||{}).length)info.append(element("span","variant-summary",Object.values(offer.variants).join(" · ")));
       if (offer.in_stock === false) info.append(element("span", "stock-badge-empty", "Нет в наличии"));
       // Offers of the same product usually repeat the product's own title;
       // showing it again under every row just clutters the card, so only
@@ -422,7 +426,7 @@ function saveSearchState() {
   if ((savedResponse.region?.id ?? null) !== Region.getId()) return;
   try {
     sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-      version: 3, query: activeQuery, data: savedResponse, region_id:Region.getId(),
+      version: 4, query: activeQuery, data: savedResponse, region_id:Region.getId(),
       displayed: displayedProductCount, scrollY: window.scrollY, filters:readFilters()
     }));
   } catch { /* Browsing also works when storage is unavailable or full. */ }
@@ -432,7 +436,7 @@ function restoreSearchState() {
     const state = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || "null");
     if (!state || ![1,2,3].includes(state.version) || typeof state.query !== "string" ||
         !Array.isArray(state.data?.products) || !Number.isInteger(state.displayed)) return;
-    if (state.version < 3 || (state.region_id ?? null) !== Region.getId()) {
+    if (state.version < 4 || (state.region_id ?? null) !== Region.getId()) {
       runSearch(state.query).then(() => {
         if (savedResponse) {populateFilters(state.filters); applyFilters(state.displayed);}
       });

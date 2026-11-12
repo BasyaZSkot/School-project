@@ -56,6 +56,10 @@ def _connect() -> Iterator[sqlite3.Connection]:
         columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
         if "password_hash" not in columns:
             db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+        if "email_verified" not in columns:
+            db.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
+        if "auth_version" not in columns:
+            db.execute("ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0")
         yield db
         db.commit()
     except Exception:
@@ -163,6 +167,8 @@ def _to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
         "role": row["role"],
         "created_at": row["created_at"],
         "last_login_at": row["last_login_at"],
+        "email_verified": bool(row["email_verified"]),
+        "auth_version": row["auth_version"],
     }
 
 
@@ -174,6 +180,7 @@ def login_user(
     name: str | None,
     picture_url: str | None,
     admin_emails: set[str],
+    email_verified: bool = False,
 ) -> dict[str, Any]:
     provider = provider.strip().lower()
     subject = subject.strip()
@@ -201,12 +208,19 @@ def login_user(
             )
         else:
             user_id = row["id"]
+            if row["email"] != email:
+                db.execute("UPDATE users SET email_verified=0 WHERE id=?", (user_id,))
+                # A link delivered to the old mailbox cannot verify a new address.
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='account_tokens'").fetchone():
+                    db.execute("DELETE FROM account_tokens WHERE user_id=?", (user_id,))
             role = "admin" if requested_admin else row["role"]
             db.execute(
                 """UPDATE users SET email = ?, name = ?, picture_url = ?, role = ?, last_login_at = ?
                    WHERE id = ?""",
                 (email, name, picture_url, role, now, user_id),
             )
+        if email_verified and email:
+            db.execute("UPDATE users SET email_verified=1 WHERE id=?",(user_id,))
         return _to_dict(db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()) or {}
 
 

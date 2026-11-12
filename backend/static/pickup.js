@@ -38,7 +38,7 @@
   }
   function updateSummary() {
     const id=Region.getEffectiveId();
-    const source=$("#product-source"), selectedMarket=source?.selectedOptions[0]?.textContent;
+    const source=$("#product-source"), selectedMarket=source?.selectedOptions[0]?.dataset.marketplace || source?.selectedOptions[0]?.textContent;
     document.querySelectorAll("[data-delivery-link]").forEach(link=>{link.href=deliveryUrl(selectedMarket,new URL(link.href).hash);});
     document.querySelectorAll("[data-pickup-summary]").forEach(el => {
       const choices=Object.values(D.read(localStorage)).filter(p=>p.region_id===id && (!selectedMarket || p.marketplace===selectedMarket));

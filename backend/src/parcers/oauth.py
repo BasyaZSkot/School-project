@@ -121,5 +121,6 @@ async def fetch_profile(provider: str, code: str, verifier: str) -> dict[str, st
         "email": str(email) if email else None,
         "name": str(name) if name else "Пользователь",
         "picture_url": str(picture_url) if picture_url else None,
+        "email_verified": provider=="google" and profile.get("email_verified") is True,
     }
 

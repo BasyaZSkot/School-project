@@ -49,7 +49,7 @@
     return confirmed ? {...d,requested_region_id:selected,region_confirmed:true}
       : {text:"Площадка не подтвердила срок для выбранного города",destination:city?.name,requested_region_id:selected,region_confirmed:false};
   }
-  const ready = fetch("/api/regions",{headers:{Accept:"application/json"}}).then(async response => {
+  const ready = Promise.resolve(window.MultiMarketPreferences?.ready).then(()=>fetch("/api/regions",{headers:{Accept:"application/json"}})).then(async response => {
     if (!response.ok) throw new Error("Не удалось загрузить города");
     const data = await response.json(); cities = Array.isArray(data.regions) ? data.regions : [];
     if (!cities.length) throw new Error("Города временно недоступны");

@@ -535,8 +535,11 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             structured.delivery = {**structured.delivery, **primary_delivery}
             structured.description = about["description"] or structured.description
         if not title or price is None:
+            if structured is not None:
+                from .variants import extract
+                structured.variants=extract(structured.title,structured.specifications,brand=structured.brand,model=structured.model,condition=structured.condition)
             return structured
-        product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
+        product_id = re.search(r"/(\d+)/?$", urlparse(page_url).path)
         offer = Offer(
             marketplace=self.marketplace,
             title=title,
@@ -554,12 +557,15 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             offer.image_url = structured.image_url
             offer.image_urls = structured.image_urls
             offer.delivery = structured.delivery
+            offer.brand=structured.brand;offer.model=structured.model;offer.seller=structured.seller;offer.condition=structured.condition;offer.gtin=structured.gtin
         else:
             offer.specifications = parser.specifications
             offer.description = about["description"]
             offer.image_urls = image_urls(parser.images, page_url)
             offer.image_url = next(iter(offer.image_urls), None)
             offer.delivery = primary_delivery or delivery_data(parser.values.get("delivery", [None])[0])
+        from .variants import extract
+        offer.variants=extract(offer.title,offer.specifications,brand=offer.brand,model=offer.model,condition=offer.condition)
         return offer
 
     @classmethod

@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import accounts, monitoring, oauth
+from . import accounts, monitoring, oauth, account_security, library, mailer, notifications, feature_api
 from .service import MarketplaceSearchService, PROVIDER_FETCH_CAP
 from .regions import REGIONS, get_region
 from .pickup import pickup_service, yandex_keys
@@ -38,13 +38,18 @@ MARKETPLACE_DOMAINS = {
 async def lifespan(app: FastAPI):
     monitoring.init_db()
     accounts.init_db()
+    library.init_db()
     stop_event = asyncio.Event()
     task = asyncio.create_task(monitoring.monitoring_loop(search_service, stop_event))
+    notification_task=asyncio.create_task(notifications.delivery_loop(stop_event))
+    telegram_task=asyncio.create_task(notifications.telegram_loop(stop_event))
     app.state.monitor_stop_event = stop_event
     app.state.monitor_task = task
-    yield
-    stop_event.set()
-    await task
+    try:
+        yield
+    finally:
+        stop_event.set()
+        await asyncio.gather(task,notification_task,telegram_task)
 
 
 app = FastAPI(
@@ -63,7 +68,7 @@ SESSION_HTTPS_ONLY = os.getenv("MULTIMARKET_COOKIE_SECURE", "false").strip().low
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
-    session_cookie="multimarket_session",
+    session_cookie=os.getenv("MULTIMARKET_SESSION_COOKIE","multimarket_session"),
     max_age=60 * 60 * 24 * 14,
     same_site="lax",
     https_only=SESSION_HTTPS_ONLY,
@@ -73,7 +78,7 @@ app.add_middleware(
 @app.middleware("http")
 async def private_response_cache(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith(("/api/auth", "/api/monitors", "/api/alerts", "/api/admin")):
+    if request.url.path.startswith(("/api/auth", "/api/monitors", "/api/alerts", "/api/admin", "/api/favorites", "/api/preferences", "/api/notification")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -89,11 +94,25 @@ class MonitorCreate(BaseModel):
     marketplace: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=300)
     interval_seconds: int = Field(default=3600, ge=900, le=604800)
+    target_price: float | None = Field(default=None,gt=0,le=1e12,allow_inf_nan=False)
+    target_currency: str = Field(default="RUB",pattern="^[A-Z]{3}$")
+    threshold_percent: float = Field(default=10,ge=.1,le=100,allow_inf_nan=False)
+    alert_direction: str = Field(default="drop",pattern="^(drop|any)$")
+    notify_in_app: bool = True
+    notify_email: bool | None = None
+    notify_telegram: bool | None = None
 
 
 class MonitorUpdate(BaseModel):
     active: bool | None = None
     interval_seconds: int | None = Field(default=None, ge=900, le=604800)
+    target_price: float | None = Field(default=None,gt=0,le=1e12,allow_inf_nan=False)
+    target_currency: str | None = Field(default=None,pattern="^[A-Z]{3}$")
+    threshold_percent: float | None = Field(default=None,ge=.1,le=100,allow_inf_nan=False)
+    alert_direction: str | None = Field(default=None,pattern="^(drop|any)$")
+    notify_in_app: bool | None = None
+    notify_email: bool | None = None
+    notify_telegram: bool | None = None
 
 
 class PasswordLogin(BaseModel):
@@ -119,6 +138,8 @@ def _admin_emails() -> set[str]:
 
 def _current_user(request: Request) -> dict | None:
     user = accounts.get_user(request.session.get("user_id"))
+    if user and request.session.get("auth_version",0)!=user["auth_version"]:
+        request.session.clear();user=None
     if user is None and request.session.get("user_id"):
         request.session.pop("user_id", None)
         request.session.pop("csrf_token", None)
@@ -234,6 +255,7 @@ async def auth_config(request: Request):
     user = _current_user(request)
     return {
         "password_login": True,
+        "mail_enabled": bool(mailer.settings()),
         "providers": oauth.configured_providers(),
         "authenticated": user is not None,
         "user": user,
@@ -259,8 +281,12 @@ def password_register(payload: PasswordRegister, request: Request):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     request.session.clear()
-    request.session.update(user_id=user["id"], csrf_token=secrets.token_urlsafe(32))
-    return {"user": user, "authenticated": True}
+    request.session.update(user_id=user["id"],auth_version=user["auth_version"], csrf_token=secrets.token_urlsafe(32))
+    sent=False
+    if mailer.settings():
+        try:mailer.action_email(user,"verify",account_security.issue(user["id"],"verify"));sent=True
+        except (RuntimeError,ValueError):pass
+    return {"user": user, "authenticated": True,"verification_sent":sent}
 
 
 @app.post("/api/auth/login")
@@ -272,7 +298,7 @@ def password_login(payload: PasswordLogin, request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     request.session.clear()
-    request.session.update(user_id=user["id"], csrf_token=secrets.token_urlsafe(32))
+    request.session.update(user_id=user["id"],auth_version=user["auth_version"], csrf_token=secrets.token_urlsafe(32))
     return {"user": user, "authenticated": True}
 
 
@@ -326,12 +352,14 @@ async def finish_oauth(provider: str, request: Request):
             name=profile.get("name") if isinstance(profile.get("name"), str) else None,
             picture_url=profile.get("picture_url") if isinstance(profile.get("picture_url"), str) else None,
             admin_emails=_admin_emails(),
+            email_verified=profile.get("email_verified") is True,
         )
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         request.session.clear()
         return RedirectResponse("/login?error=provider", status_code=303)
     request.session.clear()
     request.session["user_id"] = user["id"]
+    request.session["auth_version"] = user["auth_version"]
     request.session["csrf_token"] = secrets.token_urlsafe(32)
     return RedirectResponse(next_path, status_code=303)
 
@@ -510,6 +538,11 @@ async def create_monitor(payload: MonitorCreate, request: Request):
             detail="Домен товара не соответствует выбранному маркетплейсу",
         )
     try:
+        settings=notifications.settings(user["id"])
+        email=payload.notify_email if payload.notify_email is not None else settings["email_enabled"]
+        telegram=payload.notify_telegram if payload.notify_telegram is not None else settings["telegram_enabled"]
+        if email and not settings["email_available"]:raise HTTPException(status_code=409,detail="Сначала подтвердите почту и включите письма в аккаунте")
+        if telegram and not settings["telegram_connected"]:raise HTTPException(status_code=409,detail="Сначала подключите Telegram в аккаунте")
         return monitoring.create_monitor(
             query=payload.query.strip(),
             product_url=payload.product_url,
@@ -517,6 +550,8 @@ async def create_monitor(payload: MonitorCreate, request: Request):
             title=payload.title.strip(),
             interval_seconds=payload.interval_seconds,
             user_id=user["id"],
+            target_price=payload.target_price,target_currency=payload.target_currency,threshold_percent=payload.threshold_percent,
+            alert_direction=payload.alert_direction,notify_in_app=payload.notify_in_app,notify_email=email,notify_telegram=telegram,
         )
     except Exception as exc:
         if "UNIQUE constraint failed" in str(exc):
@@ -552,9 +587,15 @@ async def export_monitors(request: Request):
 async def patch_monitor(monitor_id: str, payload: MonitorUpdate, request: Request):
     user = _require_user(request)
     _check_csrf(request)
+    changes=payload.model_dump(exclude_unset=True)
+    changes={k:v for k,v in changes.items() if v is not None or k=="target_price"}
+    settings=notifications.settings(user["id"])
+    if changes.get("notify_email") and not settings["email_available"]:raise HTTPException(status_code=409,detail="Сначала подтвердите почту и включите письма в аккаунте")
+    if changes.get("notify_telegram") and not settings["telegram_connected"]:raise HTTPException(status_code=409,detail="Сначала подключите Telegram в аккаунте")
     monitor = monitoring.update_monitor(
         monitor_id, user_id=user["id"], active=payload.active,
         interval_seconds=payload.interval_seconds,
+        **{k:v for k,v in changes.items() if k not in {"active","interval_seconds"}},
     )
     if not monitor:
         raise HTTPException(status_code=404, detail="Монитор не найден")
@@ -589,4 +630,5 @@ async def get_alerts(
     return {"alerts": monitoring.list_alerts(monitor_id, limit, user["id"])}
 
 
+feature_api.install(app,_require_user,_check_csrf,STATIC_DIR)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

@@ -9,6 +9,11 @@
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/session.js" defer></script>
+  <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/preferences-sync.js" defer></script>
+  <script src="/static/library-data.js" defer></script>
+  <script src="/static/collections.js" defer></script>
   <script src="/static/account.js" defer></script>
 </head>
 <body>
@@ -31,14 +36,18 @@
         <div><dt>Способ входа</dt><dd id="account-provider"></dd></div>
         <div><dt>Роль</dt><dd id="account-role"></dd></div>
         <div><dt>Создан</dt><dd id="account-created"></dd></div>
+        <div><dt>Подтверждение почты</dt><dd id="account-verified">Проверяем…</dd></div>
       </dl>
+      <div id="email-verification" hidden><p class="muted">Подтвердите почту, чтобы получать письма об изменении цены.</p><button id="verify-email" type="button" class="button button-secondary">Отправить письмо подтверждения</button><p id="verify-message" class="muted" role="status"></p></div>
       <div class="account-actions">
         <a class="button button-primary" href="/monitoring">Мои товары</a>
         <a class="button button-secondary" href="/delivery">Настроить доставку</a>
+        <a class="button button-secondary" href="/favorites">Избранное</a>
         <a id="admin-link" class="button button-secondary" href="/admin" hidden>Открыть админ-панель</a>
         <button id="logout-button" class="button button-danger" type="button">Выйти</button>
       </div>
       <p id="account-message" class="auth-message" role="status" hidden></p>
+      <section id="notification-settings" class="account-notifications" aria-labelledby="notification-settings-title"><h2 id="notification-settings-title">Уведомления</h2><p class="muted">Выберите каналы по умолчанию для новых отслеживаемых товаров. У каждого товара можно изменить настройки.</p><form id="notification-form"><label class="check-label"><input id="notification-email" type="checkbox">Письма на подтверждённую почту</label><p id="notification-email-status" class="muted"></p><label class="check-label"><input id="notification-telegram" type="checkbox">Telegram</label><p id="notification-telegram-status" class="muted"></p><div class="toolbar-actions"><button id="telegram-connect" type="button" class="button button-secondary">Подключить Telegram</button><button id="telegram-disconnect" type="button" class="text-button" hidden>Отключить Telegram</button><button type="submit" class="button button-primary">Сохранить каналы</button></div><a id="telegram-connect-link" class="button button-secondary" target="_blank" rel="noopener noreferrer" hidden>Открыть бота и нажать «Начать»</a><button id="notification-refresh" class="text-button" type="button">Проверить подключение</button></form><p id="notification-message" role="status" class="muted"></p></section>
     </section>
   </main>
   <footer class="footer"><span>© MultiMarket</span><a href="/">К поиску товаров</a></footer>

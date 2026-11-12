@@ -4,6 +4,16 @@ const marketplaceHosts = { Ozon:["ozon.ru"], Wildberries:["wildberries.ru","wild
 const $ = selector => document.querySelector(selector);
 let sources = [], selectedSource = 0, galleryImages = [], imageIndex = 0;
 let reviewLimit = 5, specsExpanded = false;
+let activeVariant="";
+const variantKey=o=>JSON.stringify(Object.fromEntries(Object.entries(o.variants||{}).sort(([a],[b])=>a.localeCompare(b))));
+const variantLabel=o=>Object.values(o.variants||{}).join(" · ") || "Вариант не указан";
+function updateVariants(){
+  const options=new Map(sources.map(o=>[variantKey(o),variantLabel(o)]));
+  if(!options.has(activeVariant))activeVariant=variantKey(sources[selectedSource]);
+  const select=$("#product-variant");select.replaceChildren(...[...options].map(([key,label])=>new Option(label,key)));select.value=activeVariant;
+  $("#product-variant-toolbar").hidden=options.size<=1;
+  if(variantKey(sources[selectedSource])!==activeVariant)selectedSource=sources.findIndex(o=>variantKey(o)===activeVariant);
+}
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -149,6 +159,8 @@ function showSource(index) {
   selectedSource = index; reviewLimit = 5; specsExpanded = false;
   $("#spec-search").value = ""; $("#review-rating").value = "";
   const offer = sources[index]; if (!offer) return;
+  activeVariant=variantKey(offer);$("#product-variant").value=activeVariant;
+  $("#product-title").textContent=offer.title;renderOffers();
   $("#product-description").textContent = offer.description || "Магазин не передал описание товара.";
   const rating = Number(offer.rating);
   $("#product-rating").textContent = rating > 0 && rating <= 5 ? rating.toLocaleString("ru-RU") + " из 5" : "Оценка не указана";
@@ -156,38 +168,42 @@ function showSource(index) {
   showGallery(offer); showSpecs(); showReviews();
 }
 function renderOffers() {
-  const best = Catalog.bestOffers(sources);
+  const visible=sources.filter(o=>variantKey(o)===activeVariant);
+  const best = Catalog.bestOffers(visible);
   $("#product-offers").replaceChildren();
-  for (const offer of sources) {
+  for (const offer of visible) {
     const card = element("article", "product-offer-card" + (best.has(offer) ? " recommended-offer" : ""));
     const info = element("div","product-offer-info");
     const badgeList = element("div","offer-badges");
     Catalog.badges(offer,best).forEach(badge => badgeList.append(element("span","best-price-badge",badge)));
     if (badgeList.childElementCount) info.append(badgeList);
     info.append(element("strong","",offer.marketplace));
+    if(offer.seller)info.append(element("span","","Продавец: "+offer.seller));
+    if(variantLabel(offer)!=="Вариант не указан")info.append(element("span","variant-summary",variantLabel(offer)));
     if (offer.in_stock != null) info.append(element("span","stock-badge" + (offer.in_stock ? "" : " stock-badge-empty"),offer.in_stock ? "В наличии" : "Нет в наличии"));
     info.append(element("span","offer-delivery",Catalog.deliveryLabel(offer)));
     if (offer.delivery?.cost != null) info.append(element("span","", "Стоимость доставки: " + (Number(offer.delivery.cost) === 0 ? "бесплатно" : money(offer.delivery.cost,offer.delivery.currency))));
     const controls = element("div","product-offer-controls");
     controls.append(element("strong","product-offer-price",money(offer.price,offer.currency)));
-    const link = element("a","button " + (best.has(offer) || sources.length === 1 ? "button-primary" : "button-secondary"),"В магазин ↗");
+    const link = element("a","button " + (best.has(offer) || visible.length === 1 ? "button-primary" : "button-secondary"),"В магазин ↗");
     link.href = offer.url; link.target = "_blank"; link.rel = "noopener noreferrer";
     controls.append(link); card.append(info,controls); $("#product-offers").append(card);
   }
   const choices = [...best];
   const recommendation = choices.find(o => Catalog.currency(o) === "RUB") || choices[0];
-  const hero = $("#product-best-price"); hero.replaceChildren(); hero.hidden = !sources.length;
+  const hero = $("#product-best-price"); hero.replaceChildren(); hero.hidden = !visible.length;
   if (recommendation) {
     hero.append(element("strong","","Лучшее предложение · " + money(recommendation.price,recommendation.currency)),element("span","",recommendation.marketplace + " · " + Catalog.deliveryLabel(recommendation)));
   } else {
     const prices = new Map();
-    sources.filter(o => o.in_stock !== false).forEach(o => prices.set(Catalog.currency(o),Math.min(prices.get(Catalog.currency(o)) ?? Infinity,Number(o.price))));
+    visible.filter(o => o.in_stock !== false).forEach(o => prices.set(Catalog.currency(o),Math.min(prices.get(Catalog.currency(o)) ?? Infinity,Number(o.price))));
     hero.textContent = prices.size ? "Цена: " + [...prices].map(([c,p]) => money(p,c)).join(" · ") : "Нет предложений в наличии";
   }
+  if(visible.length)$("#product-collection-actions").replaceChildren(window.MultiMarketLibrary.controls({title:sources[selectedSource]?.title||visible[0].title,offers:visible}));
 }
 function updateSourceSelect() {
   const select = $("#product-source"); select.replaceChildren();
-  sources.forEach((o,i) => select.append(new Option(o.marketplace,String(i))));
+  sources.forEach((o,i) => {const option=new Option(o.marketplace+(o.seller?" · "+o.seller:""),String(i));option.dataset.marketplace=o.marketplace;select.append(option);});
   select.value = String(selectedSource); $("#product-source-toolbar").hidden = !sources.length;
   window.MultiMarketPickup?.refresh();
 }
@@ -204,7 +220,7 @@ async function loadProduct() {
   [...new Set(sources.map(o => o.marketplace))].forEach(m => $("#product-marketplaces").append(element("span","marketplace-chip",m)));
   const richness = o => Catalog.images(o).length + (o.specifications?.length || 0) + (o.reviews?.length || 0) + (o.description ? 1 : 0);
   selectedSource = sources.reduce((best,o,i) => richness(o) > richness(sources[best]) ? i : best,0);
-  renderOffers(); updateSourceSelect(); showSource(selectedSource);
+  updateVariants(); renderOffers(); updateSourceSelect(); showSource(selectedSource);
   $("#product-status").textContent = "Обновляем фотографии, характеристики, отзывы и доставку…";
   let userSelected = false;
   $("#product-source").addEventListener("change", event => {userSelected = true; showSource(Number(event.target.value));});
@@ -221,7 +237,8 @@ async function loadProduct() {
   sources = sources.map((offer,i) => {
     const detail = results[i]; if (!detail) return offer;
     const next = {...offer};
-    for (const key of ["description","rating","review_count","in_stock"]) if (detail[key] != null && detail[key] !== "") next[key] = detail[key];
+    for (const key of ["description","rating","review_count","in_stock","brand","model","seller","condition"]) if (detail[key] != null && detail[key] !== "") next[key] = detail[key];
+    next.variants=Object.keys(detail.variants||{}).length?detail.variants:offer.variants;
     next.image_urls = [...new Set([...Catalog.images(detail),...Catalog.images(offer)])].slice(0,20); next.image_url = next.image_urls[0];
     next.specifications = detail.specifications?.length ? detail.specifications : offer.specifications;
     next.reviews = reviewItems({reviews:[...(detail.reviews || []),...(offer.reviews || [])]});
@@ -230,12 +247,13 @@ async function loadProduct() {
   });
   if (!userSelected) selectedSource = sources.reduce((best,o,i) => richness(o) > richness(sources[best]) ? i : best,0);
   Region.observeOffers(sources);
-  renderOffers(); updateSourceSelect(); showSource(selectedSource);
+  updateVariants(); renderOffers(); updateSourceSelect(); showSource(selectedSource);
   $("#product-status").textContent = sources.some(o => o.delivery?.region_confirmed === false)
     ? "Магазин не подтвердил выбранный город. Срок доставки уточните в магазине."
     : results.some(Boolean) ? "Сведения обновлены из доступных карточек магазинов." : "Показаны доступные сведения из поиска. Остальные подробности можно уточнить в магазине.";
 }
 $("#spec-search").addEventListener("input",showSpecs);
+$("#product-variant").addEventListener("change",()=>{activeVariant=$("#product-variant").value;selectedSource=sources.findIndex(o=>variantKey(o)===activeVariant);updateSourceSelect();showSource(selectedSource);});
 function selectAboutTab(name, focus = false) {
   for (const key of ["description", "specs"]) {
     const active = key === name;

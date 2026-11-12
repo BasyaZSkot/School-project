@@ -1,4 +1,5 @@
 let monitorCsrfToken = "";
+let channelSettings={};
 const list = document.querySelector("#monitor-list");
 const note = document.querySelector("#page-message");
 function el(tag, cls, text) {
@@ -24,6 +25,7 @@ async function loadMonitors() {
     const auth = await authResponse.json();
     if (!auth.authenticated) { location.replace("/login?next=/monitoring"); return; }
     monitorCsrfToken = auth.csrf_token;
+    channelSettings=await window.MultiMarketSession.request("/api/notification-settings");
     const response = await fetch("/api/monitors");
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Не удалось загрузить мониторинг.");
@@ -64,6 +66,22 @@ async function loadMonitors() {
       productLink.rel = "noopener noreferrer";
       controls.append(history, toggle, remove, productLink);
       card.append(info, controls);
+      const settings=el("details","monitor-settings"),summary=el("summary","","Цена и уведомления");settings.append(summary);
+      const form=el("form","monitor-settings-form"),mode=el("select"),target=el("input"),currency=el("select"),percent=el("input"),direction=el("select"),interval=el("select");
+      mode.append(new Option("Изменение на процент","percent"),new Option("Цена не выше заданной","target"));mode.value=monitor.target_price!=null?"target":"percent";
+      target.type="number";target.min="0.01";target.max="1000000000000";target.step="0.01";target.value=monitor.target_price??"";
+      for(const c of [...new Set(["RUB","USD","EUR","BYN","KZT",monitor.target_currency||"RUB"])])currency.append(new Option(c,c));currency.value=monitor.target_currency||"RUB";
+      percent.type="number";percent.min="0.1";percent.max="100";percent.step="0.1";percent.value=monitor.threshold_percent;
+      direction.append(new Option("Только снижение","drop"),new Option("Снижение и рост","any"));direction.value=monitor.alert_direction;
+      for(const [seconds,label] of [[900,"15 минут"],[3600,"1 час"],[21600,"6 часов"],[86400,"1 день"],[604800,"1 неделя"]])interval.append(new Option(label,seconds));if(![900,3600,21600,86400,604800].includes(monitor.interval_seconds))interval.append(new Option(monitor.interval_seconds+" секунд",monitor.interval_seconds));interval.value=String(monitor.interval_seconds);
+      function field(label,input){const node=el("label","",label);node.append(input);return node;}
+      const targetField=field("Целевая цена",target),currencyField=field("Валюта цели",currency),percentField=field("Изменение, %",percent),directionField=field("Когда сообщать",direction);
+      const fields=el("div","monitor-rule-fields");fields.append(field("Условие",mode),targetField,currencyField,percentField,directionField,field("Проверять каждые",interval));
+      function rule(){const isTarget=mode.value==="target";targetField.hidden=currencyField.hidden=!isTarget;percentField.hidden=directionField.hidden=isTarget;target.required=isTarget;percent.required=!isTarget;}mode.addEventListener("change",rule);rule();form.append(fields);
+      const checkboxes={};for(const [key,label,enabled] of [["notify_in_app","На сайте",true],["notify_email","Email",channelSettings.email_available],["notify_telegram","Telegram",channelSettings.telegram_connected]]){const check=el("input");check.type="checkbox";check.checked=!!monitor[key];check.disabled=!enabled&&!monitor[key];checkboxes[key]=check;const labelNode=el("label","check-label");labelNode.append(check,document.createTextNode(label));form.append(labelNode);}
+      const help=el("a","text-button","Подключить почту или Telegram");help.href="/account#notification-settings";form.append(help);
+      const save=el("button","button button-primary","Сохранить настройки"),feedback=el("p","muted");save.type="submit";feedback.role="status";form.append(save,feedback);
+      form.addEventListener("submit",async e=>{e.preventDefault();save.disabled=true;try{const updated=await window.MultiMarketSession.request("/api/monitors/"+monitor.id,"PATCH",{target_price:mode.value==="target"?Number(target.value):null,target_currency:currency.value,threshold_percent:Number(percent.value),alert_direction:direction.value,interval_seconds:Number(interval.value),...Object.fromEntries(Object.entries(checkboxes).filter(([key,input])=>input.checked!==!!monitor[key]).map(([key,input])=>[key,input.checked]))});Object.assign(monitor,updated);feedback.textContent="Настройки сохранены.";}catch(error){feedback.textContent=error.message;}finally{save.disabled=false;}});settings.append(form);card.append(settings);
       list.append(card);
     });
   } catch (error) {

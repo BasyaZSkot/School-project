@@ -41,6 +41,9 @@ class Offer:
     reviews: list[dict[str, str]] = field(default_factory=list)
     image_urls: list[str] = field(default_factory=list)
     delivery: dict = field(default_factory=dict)
+    seller: str | None = None
+    condition: str | None = None
+    variants: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.title = self.title.strip()
@@ -53,6 +56,8 @@ class Offer:
             raise ValueError("Offer currency must be a three-letter code")
         if not self.url.startswith("https://"):
             raise ValueError("Offer URL must use HTTPS")
+        from .variants import extract
+        self.variants = extract(self.title, self.specifications, self.variants, self.brand, self.model, self.condition)
 
 
 @dataclass(slots=True)
@@ -125,10 +130,12 @@ def normalize_title(value: str) -> str:
 
 
 def offer_group_key(offer: Offer) -> str:
+    from .variants import signature
+    suffix = ":variant:" + signature(offer)
     if offer.gtin:
         digits = "".join(char for char in offer.gtin if char.isdigit())
         if len(digits) in {8, 12, 13, 14}:
-            return f"gtin:{digits}"
+            return f"gtin:{digits}" + suffix
     if offer.brand and offer.model:
-        return f"model:{normalize_title(offer.brand)}:{normalize_title(offer.model)}"
-    return f"title:{normalize_title(offer.title)}"
+        return f"model:{normalize_title(offer.brand)}:{normalize_title(offer.model)}" + suffix
+    return f"title:{normalize_title(offer.title)}" + suffix

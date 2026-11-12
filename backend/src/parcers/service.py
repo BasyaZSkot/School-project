@@ -21,6 +21,7 @@ from .transport import BlockedError
 from .wb import WildberriesAdapter
 from .ym import YandexMarketAdapter
 from .regions import region_scope, regional_delivery, regional_url
+from .variants import signature as variant_signature
 
 # How many raw offers we are willing to request from one provider for one
 # search call. Ozon/WB only ever fetch a single public page regardless of
@@ -96,9 +97,9 @@ class MarketplaceSearchService:
     @staticmethod
     def _merge_provider_offers(existing: list[Offer], incoming: list[Offer]) -> list[Offer]:
         merged = list(existing)
-        indexes = {offer.external_id or offer.url: index for index, offer in enumerate(merged)}
+        indexes = {(offer.external_id or offer.url,variant_signature(offer)): index for index, offer in enumerate(merged)}
         for offer in incoming:
-            identity = offer.external_id or offer.url
+            identity = (offer.external_id or offer.url,variant_signature(offer))
             if identity in indexes:
                 merged[indexes[identity]] = offer
             else:
@@ -258,7 +259,7 @@ class MarketplaceSearchService:
                 elif len(result.offers) >= provider_limit:
                     provider_may_have_more = True
                 for offer in result.offers:
-                    identity = (offer.marketplace, offer.external_id or offer.url)
+                    identity = (offer.marketplace, offer.external_id or offer.url,variant_signature(offer))
                     if identity not in seen:
                         seen.add(identity)
                         offers.append(offer)
@@ -326,6 +327,9 @@ class MarketplaceSearchService:
                         "delivery": item.delivery,
                         "brand": item.brand,
                         "model": item.model,
+                        "seller": item.seller,
+                        "condition": item.condition,
+                        "variants": item.variants,
                         "external_id": item.external_id,
                         "description": item.description,
                         "rating": item.rating,

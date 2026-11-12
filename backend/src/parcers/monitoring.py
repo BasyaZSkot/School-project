@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import os
 import sqlite3
 import uuid
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -92,10 +93,19 @@ def init_db() -> None:
             created_at TEXT NOT NULL
         );
         """)
+        columns={r["name"] for r in db.execute("PRAGMA table_info(monitors)")}
+        for name,definition in {"target_price":"REAL", "target_currency":"TEXT NOT NULL DEFAULT 'RUB'", "threshold_percent":"REAL NOT NULL DEFAULT 10", "alert_direction":"TEXT NOT NULL DEFAULT 'any'", "target_met":"INTEGER NOT NULL DEFAULT 0", "notify_in_app":"INTEGER NOT NULL DEFAULT 1", "notify_email":"INTEGER NOT NULL DEFAULT 0", "notify_telegram":"INTEGER NOT NULL DEFAULT 0"}.items():
+            if name not in columns:db.execute(f"ALTER TABLE monitors ADD COLUMN {name} {definition}")
+        columns={r["name"] for r in db.execute("PRAGMA table_info(price_alerts)")}
+        if "reason" not in columns:db.execute("ALTER TABLE price_alerts ADD COLUMN reason TEXT NOT NULL DEFAULT 'percent'")
+        if "in_app" not in columns:db.execute("ALTER TABLE price_alerts ADD COLUMN in_app INTEGER NOT NULL DEFAULT 1")
+        if "read_at" not in columns:db.execute("ALTER TABLE price_alerts ADD COLUMN read_at TEXT")
 
 
 def create_monitor(*, query: str, product_url: str, marketplace: str, title: str,
-                   interval_seconds: int, user_id: str | None = None) -> dict[str, Any]:
+                   interval_seconds: int, user_id: str | None = None, target_price=None,
+                   target_currency="RUB", threshold_percent=10, alert_direction="any",
+                   notify_in_app=True, notify_email=False, notify_telegram=False) -> dict[str, Any]:
     now = _now()
     monitor_id = str(uuid.uuid4())
     with _connect() as db:
@@ -108,12 +118,16 @@ def create_monitor(*, query: str, product_url: str, marketplace: str, title: str
              now.isoformat(), now.isoformat(), user_id),
         )
         row = db.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
+        db.execute("UPDATE monitors SET target_price=?,target_currency=?,threshold_percent=?,alert_direction=?,notify_in_app=?,notify_email=?,notify_telegram=? WHERE id=?",(target_price,target_currency,threshold_percent,alert_direction,int(notify_in_app),int(notify_email),int(notify_telegram),monitor_id))
+        row = db.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
     return _monitor_dict(row)
 
 
 def _monitor_dict(row: sqlite3.Row) -> dict[str, Any]:
     result = dict(row)
     result["active"] = bool(result["active"])
+    for key in ("notify_in_app","notify_email","notify_telegram","target_met"):
+        if key in result:result[key]=bool(result[key])
     return result
 
 
@@ -130,7 +144,7 @@ def get_monitor(monitor_id: str, user_id: str | None = None) -> dict[str, Any] |
 
 
 def update_monitor(monitor_id: str, *, user_id: str | None = None, active: bool | None = None,
-                   interval_seconds: int | None = None) -> dict[str, Any] | None:
+                   interval_seconds: int | None = None, **settings) -> dict[str, Any] | None:
     assignments, values = [], []
     if active is not None:
         assignments.append("active = ?")
@@ -138,6 +152,14 @@ def update_monitor(monitor_id: str, *, user_id: str | None = None, active: bool 
     if interval_seconds is not None:
         assignments.extend(["interval_seconds = ?", "next_run_at = ?"])
         values.extend([interval_seconds, _now().isoformat()])
+    allowed={"target_price","target_currency","threshold_percent","alert_direction","notify_in_app","notify_email","notify_telegram"}
+    for key,value in settings.items():
+        if key in allowed:
+            assignments.append(key+" = ?");values.append(int(value) if key.startswith("notify_") else value)
+    if set(settings)&{"target_price","target_currency"}:
+        current=get_monitor(monitor_id,user_id)
+        if current and any(k in settings and settings[k]!=current[k] for k in ("target_price","target_currency")):
+            assignments.append("target_met = 0")
     if assignments:
         values.append(monitor_id)
         with _connect() as db:
@@ -169,9 +191,11 @@ def record_check(monitor_id: str, *, price: float | None, currency: str | None,
                  status: str, alert_threshold_percent: float = 10.0) -> dict[str, Any] | None:
     now = _now()
     alert_data = None
+    if price is not None and (not math.isfinite(price) or price<=0):price=None;currency=None;status="invalid_price"
     with _connect() as db:
+        db.execute("BEGIN IMMEDIATE")
         row = db.execute(
-            "SELECT current_price, currency, interval_seconds FROM monitors WHERE id = ?",
+            "SELECT * FROM monitors WHERE id = ?",
             (monitor_id,),
         ).fetchone()
         if row is None:
@@ -184,21 +208,30 @@ def record_check(monitor_id: str, *, price: float | None, currency: str | None,
                 VALUES (?, ?, ?, ?)""",
                 (monitor_id, price, currency, now.isoformat()),
             )
-            if previous is not None and previous_currency == currency and previous > 0:
-                change = (price - previous) / previous * 100
-                if abs(change) >= alert_threshold_percent:
+            change=(price-previous)/previous*100 if previous is not None and previous_currency==currency and previous>0 else 0
+            target=row["target_price"]
+            met=target is not None and currency==row["target_currency"] and price<=target
+            db.execute("UPDATE monitors SET target_met=? WHERE id=?",(int(met),monitor_id))
+            reason="target" if met and not row["target_met"] else None
+            if target is None and previous is not None and previous_currency==currency and previous>0:
+                threshold=row["threshold_percent"] if alert_threshold_percent==10 else alert_threshold_percent
+                if abs(change)>=threshold and (row["alert_direction"]=="any" or change<0):reason="percent"
+            if reason:
                     cursor = db.execute(
                         """INSERT INTO price_alerts
-                        (monitor_id, old_price, new_price, currency, change_percent, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?)""",
-                        (monitor_id, previous, price, currency, change, now.isoformat()),
+                        (monitor_id, old_price, new_price, currency, change_percent, created_at,reason,in_app)
+                        VALUES (?, ?, ?, ?, ?, ?,?,?)""",
+                        (monitor_id, previous if previous is not None and previous_currency==currency else price, price, currency, change, now.isoformat(),reason,row["notify_in_app"]),
                     )
                     alert_data = {
                         "id": cursor.lastrowid, "monitor_id": monitor_id,
-                        "old_price": previous, "new_price": price,
+                        "old_price": previous if previous is not None and previous_currency==currency else price, "new_price": price,
                         "currency": currency, "change_percent": change,
                         "created_at": now.isoformat(),
+                        "reason":reason,
                     }
+                    from .notifications import enqueue
+                    enqueue(db,alert_data,dict(row))
             db.execute(
                 """UPDATE monitors SET current_price = ?, currency = ?, last_checked_at = ?,
                 next_run_at = ?, last_status = ? WHERE id = ?""",
@@ -254,7 +287,7 @@ def price_history(monitor_id: str, limit: int = 500) -> list[dict[str, Any]]:
 
 
 def list_alerts(monitor_id: str | None = None, limit: int = 100, user_id: str | None = None) -> list[dict[str, Any]]:
-    conditions, values = [], []
+    conditions, values = ["a.in_app = 1"], []
     if monitor_id:
         conditions.append("a.monitor_id = ?")
         values.append(monitor_id)
@@ -264,7 +297,12 @@ def list_alerts(monitor_id: str | None = None, limit: int = 100, user_id: str | 
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     with _connect() as db:
         rows = db.execute("SELECT a.* FROM price_alerts a JOIN monitors m ON m.id = a.monitor_id" + where + " ORDER BY a.created_at DESC LIMIT ?", (*values, limit)).fetchall()
-    return [dict(row) for row in rows]
+        from .notifications import schema
+        schema(db);deliveries={}
+        if rows:
+            ids=[row["id"] for row in rows]
+            for delivery in db.execute("SELECT alert_id,channel,status FROM notification_deliveries WHERE alert_id IN ("+",".join("?" for _ in ids)+")",ids):deliveries.setdefault(delivery["alert_id"],{})[delivery["channel"]]=delivery["status"]
+    return [{**dict(row),"deliveries":deliveries.get(row["id"],{})} for row in rows]
 
 
 async def monitoring_loop(search_service, stop_event, interval_seconds: int = 30) -> None:

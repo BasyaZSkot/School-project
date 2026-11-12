@@ -10,9 +10,13 @@
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/session.js" defer></script>
   <script src="/static/catalog.js" defer></script>
-  <script src="/static/region.js" defer></script>
   <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/preferences-sync.js" defer></script>
+  <script src="/static/region.js" defer></script>
+  <script src="/static/library-data.js" defer></script>
+  <script src="/static/collections.js" defer></script>
   <script src="/static/pickup.js" defer></script>
   <script src="/static/product.js" defer></script>
 </head>
@@ -43,6 +47,8 @@
         <h1 id="product-title">Загружаем товар…</h1>
         <p id="product-status" class="detail-status" role="status">Читаем доступные публичные данные.</p>
         <div id="product-best-price" class="product-best-price" hidden></div>
+        <div id="product-collection-actions"></div>
+        <div id="product-variant-toolbar" class="product-variant-toolbar" hidden><label for="product-variant">Вариант товара</label><select id="product-variant"></select><p class="muted">Сравниваем цены только выбранного варианта.</p></div>
       </div>
     </section>
     <nav class="product-section-nav" aria-label="Разделы товара"><a href="#product-comparison">Предложения</a><a href="#product-details">Характеристики</a><a href="#product-review-section">Отзывы</a></nav>

@@ -8,8 +8,12 @@
   <title>Доставка — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
   <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/region.js" defer></script>
+  <script src="/static/session.js" defer></script>
   <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/preferences-sync.js" defer></script>
+  <script src="/static/region.js" defer></script>
+  <script src="/static/library-data.js" defer></script>
+  <script src="/static/collections.js" defer></script>
   <script src="/static/pickup.js" defer></script>
 </head>
 <body>
@@ -23,7 +27,7 @@
     <a class="back-link" data-delivery-back href="/">← Вернуться к поиску</a>
     <section class="page-intro"><h1>Доставка</h1><p>Выберите город и удобный пункт выдачи для каждого маркетплейса.</p></section>
     <div class="delivery-overview">
-      <section class="delivery-city-card" id="city" aria-labelledby="delivery-city-title"><h2 id="delivery-city-title">Город доставки</h2><p class="muted">Выбор сохраняется автоматически в этом браузере.</p><div id="delivery-city-slot"><p class="muted">Загружаем города…</p></div><p class="delivery-feedback" id="delivery-city-status" role="status"></p></section>
+      <section class="delivery-city-card" id="city" aria-labelledby="delivery-city-title"><h2 id="delivery-city-title">Город доставки</h2><p class="muted" data-preferences-status>Загружаем настройки доставки…</p><div id="delivery-city-slot"><p class="muted">Загружаем города…</p></div><p class="delivery-feedback" id="delivery-city-status" role="status"></p></section>
       <section class="delivery-saved-card" aria-labelledby="delivery-saved-title"><h2 id="delivery-saved-title">Ваши пункты выдачи</h2><ul id="delivery-saved-list" class="delivery-saved-list"><li class="muted">Загружаем сохранённые пункты…</li></ul></section>
     </div>
     <div id="pickup-page"></div>

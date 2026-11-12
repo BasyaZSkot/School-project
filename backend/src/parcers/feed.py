@@ -115,6 +115,9 @@ class JsonFeedAdapter(DisabledAdapter):
                 rating=rating,
                 review_count=review_count,
                 specifications=specifications,
+                seller=str(item["seller"])[:200] if isinstance(item.get("seller"),str) else None,
+                condition=str(item["condition"])[:160] if isinstance(item.get("condition"),str) else None,
+                variants=item.get("variants") if isinstance(item.get("variants"),dict) else {},
                 reviews=reviews,
             )
         except (KeyError, TypeError, ValueError):
