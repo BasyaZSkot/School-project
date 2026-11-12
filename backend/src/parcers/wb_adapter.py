@@ -10,6 +10,7 @@ import json
 from typing import Any
 
 from .base import MAX_PROVIDER_LIMIT, DisabledAdapter, Offer, ProviderResult, SearchStatus
+from .product_data import MAX_SPECIFICATIONS, delivery_data, image_urls
 
 RecordSource = Callable[[str, int], Awaitable[Iterable[Any]]]
 
@@ -56,7 +57,7 @@ def _wb_specifications(value: Any) -> list[dict[str, str]]:
         text = str(raw_value).strip()
         if label and text:
             specifications.append({"name": label[:120], "value": text[:500]})
-        if len(specifications) >= 30:
+        if len(specifications) >= MAX_SPECIFICATIONS:
             break
     return specifications
 
@@ -134,6 +135,8 @@ def wb_record_to_offer(record: Any) -> Offer | None:
         gtin=None,
         in_stock=in_stock,
         image_url=image_url,
+        image_urls=image_urls([image_links.split(";"), _read(record, "images", [])]),
+        delivery=delivery_data(_read(record, "delivery")),
         description=description,
         rating=rating,
         review_count=review_count,

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fafafa">
+  <title>Администрирование — MultiMarket</title>
+  <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
+  <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/admin.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
+  <header class="topbar">
+    <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация">
+      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
+      <a href="/history">История цен</a>
+    </nav>
+    <a class="top-action" href="/account">Аккаунт</a>
+  </header>
+  <main class="page" id="main-content">
+    <section class="page-intro page-intro-compact">
+      <h1>Админ-панель</h1>
+      <p>Просматривайте аккаунты и меняйте роли пользователей.</p>
+    </section>
+    <section class="admin-panel">
+      <div class="section-toolbar"><div><h2>Пользователи</h2><p id="admin-count" class="muted"></p></div><button id="refresh-users" class="button button-secondary" type="button">Обновить</button></div>
+      <p id="admin-message" class="auth-message" role="status" hidden></p>
+      <div id="users-list" class="admin-user-list"></div>
+    </section>
+  </main>
+  <footer class="footer"><nav class="footer-contacts" aria-label="Контакты автора"><a href="https://github.com/BasyaZSkot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://t.me/kvakva239" target="_blank" rel="noopener noreferrer">Telegram</a><a href="mailto:vasya.zeldin@gmail.com">Почта</a><a href="mailto:zeldinvasya@gmail.com">Запасная почта</a></nav><span>© MultiMarket</span><a href="/account">Профиль</a></footer>
+</body>
+</html>

@@ -3,85 +3,104 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
-  <meta name="description" content="Поиск и сравнение цен на Wildberries, Ozon и Яндекс Маркете.">
+  <meta name="theme-color" content="#fafafa">
+  <meta name="description" content="Найдите нужный товар, сравните доступные предложения и следите за ценой.">
   <title>Поиск цен — MultiMarket</title>
+  <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
+  <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/session.js" defer></script>
+  <script src="/static/catalog.js" defer></script>
+  <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/preferences-sync.js" defer></script>
+  <script src="/static/region.js" defer></script>
+  <script src="/static/library-data.js" defer></script>
+  <script src="/static/collections.js" defer></script>
+  <script src="/static/pickup.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="MultiMarket, поиск">
-      <span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span>
+      <img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span>
     </a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a class="active" href="/">Поиск</a>
-      <a href="/monitoring">Мониторинг</a>
+      <a class="active" aria-current="page" href="/">Поиск</a>
+      <a href="/delivery">Доставка</a>
+      <a href="/monitoring">Мои товары</a>
       <a href="/history">История цен</a>
-      <a href="/sources">Источники</a>
     </nav>
-    <a class="top-action" href="/sources">Подключить источник</a>
+    <a class="top-action" href="/account">Аккаунт</a>
   </header>
 
-  <main class="page">
-    <section class="page-intro">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> СРАВНЕНИЕ МАРКЕТПЛЕЙСОВ</div>
-      <h1>Найди товар<br><span>по лучшей цене</span></h1>
-      <p>Сравни предложения Wildberries, Ozon и Яндекс Маркета в одном поиске.</p>
+  <main class="page search-page" id="main-content">
+    <section class="page-intro search-intro">
+      <h1>Нужный товар.<br><span>Подходящая цена.</span></h1>
+      <p>Найдите товар, сравните предложения и следите за ценой.</p>
     </section>
 
-    <form class="search-form" id="search-form">
+    <div class="search-settings" id="delivery-region"><a class="region-button" data-delivery-link href="/delivery#city">Город доставки: <span data-region-label>Регион площадки</span> <span aria-hidden="true">⌄</span></a><span class="muted">Для расчёта сроков доставки</span></div>
+    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery">Выбрать пункт выдачи</a><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
+    <form class="search-form" id="search-form" role="search">
       <label class="sr-only" for="search-input">Название товара</label>
-      <span class="search-icon" aria-hidden="true">⌕</span>
+      <svg class="search-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
       <input id="search-input" name="q" type="search" maxlength="160"
-        placeholder="Например, Sony WH-1000XM5" autocomplete="off" required>
-      <button id="search-button" type="submit">Найти <span aria-hidden="true">→</span></button>
+        placeholder="Название товара или модель" autocomplete="off" aria-describedby="search-help" required>
+      <button id="search-button" type="submit">Найти</button>
     </form>
     <div class="search-examples">
-      <span>Популярные запросы</span>
+      <span>Например</span>
       <button class="example-query" type="button">iPhone 16</button>
       <button class="example-query" type="button">кофемашина</button>
       <button class="example-query" type="button">Sony WH-1000XM5</button>
     </div>
 
-    <section class="results-section" id="results" aria-live="polite">
+    <p class="search-help" id="search-help">Для точного поиска укажите бренд и модель товара.</p>
+    <div class="search-guide" id="search-guide">
+      <p>Понравился товар? Нажмите «Следить за ценой» в результатах.</p>
+      <a href="/monitoring">Мои товары <span aria-hidden="true">→</span></a>
+    </div>
+
+    <section class="results-section" id="results" aria-labelledby="results-title" aria-busy="false" hidden>
       <div class="section-heading">
-        <div><div class="section-kicker">РЕЗУЛЬТАТЫ ПОИСКА</div><h2 id="results-title">Готов к поиску</h2></div>
-        <span class="result-count" id="result-count">до 20 товаров</span>
+        <h2 id="results-title" aria-live="polite">Результаты поиска</h2>
+        <span class="result-count" id="result-count"></span>
       </div>
-      <div class="provider-grid" id="provider-grid">
-        <article class="provider-card"><div class="provider-top"><span class="provider-logo ozon-logo">O</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Ozon</h3><p>Проверим доступные предложения</p></article>
-        <article class="provider-card"><div class="provider-top"><span class="provider-logo wb-logo">WB</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Wildberries</h3><p>Проверим доступные предложения</p></article>
-        <article class="provider-card"><div class="provider-top"><span class="provider-logo ym-logo">Я</span><span class="status status-neutral">Ожидает запрос</span></div><h3>Яндекс Маркет</h3><p>Проверим доступные предложения</p></article>
-      </div>
+      <p class="loading-card" id="search-loading" role="status" hidden>Ищем доступные предложения…</p>
+      <form id="catalog-filters" class="catalog-filters" aria-label="Фильтры товаров" hidden>
+        <div class="filter-primary">
+          <label>Цена от<input id="filter-min" type="number" min="0" step="any" placeholder="0" inputmode="decimal"></label>
+          <label>Цена до<input id="filter-max" type="number" min="0" step="any" placeholder="Любая" inputmode="decimal"></label>
+          <label>Валюта<select id="filter-currency"><option value="RUB">RUB</option></select></label>
+          <label class="filter-sort">Порядок<select id="filter-sort"><option value="relevance">Как в поиске</option><option value="price-asc">Сначала дешевле</option><option value="price-desc">Сначала дороже</option><option value="rating">По оценке</option><option value="delivery">По сроку доставки</option></select></label>
+        </div>
+        <details class="filter-more">
+          <summary>Ещё фильтры <span id="filter-active-count"></span></summary>
+          <div class="filter-secondary">
+            <label>Площадка<select id="filter-marketplace"><option value="">Все площадки</option></select></label>
+            <label>Бренд<select id="filter-brand"><option value="">Все бренды</option></select></label>
+            <label>Оценка<select id="filter-rating"><option value="">Любая</option><option value="4">От 4</option><option value="4.5">От 4,5</option><option value="4.8">От 4,8</option></select></label>
+            <label>Доставка<select id="filter-delivery"><option value="">Любой срок</option><option value="1">До 1 дня</option><option value="3">До 3 дней</option><option value="7">До недели</option><option value="known">Срок известен</option></select></label>
+            <label class="filter-checkbox"><input id="filter-stock" type="checkbox">Только в наличии</label>
+          </div>
+        </details>
+        <div class="filter-footer"><p id="filter-feedback" role="status">Фильтры применяются к загруженным товарам.</p><button id="reset-filters" class="text-button" type="button">Сбросить фильтры</button></div>
+      </form>
       <div class="offers-wrap" id="offers-wrap" hidden>
-        <div class="offers-heading"><h3>Предложения</h3><span id="offers-caption"></span></div>
+        <p class="offers-caption" id="offers-caption" role="status"></p>
         <div id="offers-list" class="offers-list"></div>
         <button id="load-more-button" class="load-more-button" type="button" hidden>Показать ещё 20 товаров</button>
       </div>
-      <div class="empty-state" id="empty-state"><div class="empty-icon">⌕</div><strong>Здесь появятся товары</strong><span>Введи название товара в строку поиска.</span></div>
-      <div class="notice" id="notice" hidden><span class="notice-icon">i</span><p></p></div>
-      <dialog class="product-dialog" id="product-dialog" aria-labelledby="detail-title">
-        <div class="dialog-header">
-          <div><span class="detail-market" id="detail-market"></span><h2 id="detail-title">Товар</h2></div>
-          <button class="dialog-close" id="detail-close" type="button" aria-label="Закрыть подробности">×</button>
-        </div>
-        <div class="detail-summary">
-          <img id="detail-image" class="detail-image" alt="" hidden>
-          <div class="detail-price"><span>Цена предложения</span><strong id="detail-price-value"></strong></div>
-          <a id="detail-link" class="button button-primary" target="_blank" rel="noopener noreferrer">Открыть на площадке ↗</a>
-        </div>
-        <p class="detail-status" id="detail-status" role="status"></p>
-        <section class="detail-section"><h3>Описание</h3><p id="detail-description"></p></section>
-        <div class="detail-metrics">
-          <section class="detail-section"><h3>Рейтинг</h3><p id="detail-rating"></p></section>
-          <section class="detail-section"><h3>Количество отзывов и оценок</h3><p id="detail-reviews"></p></section>
-        </div>
-        <section class="detail-section"><h3>Отзывы покупателей</h3><div class="detail-review-list" id="detail-review-list"></div></section>
-        <section class="detail-section"><h3>Характеристики</h3><dl class="detail-specs" id="detail-specs"></dl></section>
-      </dialog>
+      <div class="empty-state" id="empty-state" hidden><strong>Ничего не нашлось</strong><span>Уточните название или попробуйте другой запрос.</span><button class="button button-secondary" id="retry-search" type="button">Повторить поиск</button></div>
+      <div class="notice" id="notice" role="status" hidden><span class="notice-icon" aria-hidden="true">i</span><p></p></div>
+      <details class="provider-details" id="provider-details" hidden>
+        <summary>Площадки и доступность</summary>
+        <div class="provider-grid" id="provider-grid"></div>
+      </details>
     </section>
   </main>
-  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
+  <footer class="footer"><nav class="footer-contacts" aria-label="Контакты автора"><a href="https://github.com/BasyaZSkot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://t.me/kvakva239" target="_blank" rel="noopener noreferrer">Telegram</a><a href="mailto:vasya.zeldin@gmail.com">Почта</a><a href="mailto:zeldinvasya@gmail.com">Запасная почта</a></nav><span>© MultiMarket</span><a href="/sources">О сервисе</a></footer>
 </body>
 </html>

@@ -106,8 +106,13 @@ class MarketplaceApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("MultiMarket", response.text)
 
+    def test_product_detail_page_is_served_separately(self):
+        response = self.client.get("/product")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Предложения магазинов", response.text)
+
     def test_navigation_pages_are_served_separately(self):
-        for path in ("/monitoring", "/history", "/sources"):
+        for path in ("/sources", "/login"):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)

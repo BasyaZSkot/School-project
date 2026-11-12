@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fafafa">
+  <meta name="description" content="Выберите город доставки и удобные пункты выдачи маркетплейсов.">
+  <title>Доставка — MultiMarket</title>
+  <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/session.js" defer></script>
+  <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/preferences-sync.js" defer></script>
+  <script src="/static/region.js" defer></script>
+  <script src="/static/library-data.js" defer></script>
+  <script src="/static/collections.js" defer></script>
+  <script src="/static/pickup.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="MultiMarket, поиск"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация"><a href="/">Поиск</a><a class="active" aria-current="page" href="/delivery">Доставка</a><a href="/monitoring">Мои товары</a><a href="/history">История цен</a></nav>
+    <a class="top-action" href="/account">Аккаунт</a>
+  </header>
+  <main class="page delivery-page" id="main-content">
+    <a class="back-link" data-delivery-back href="/">← Вернуться к поиску</a>
+    <section class="page-intro"><h1>Доставка</h1><p>Выберите город и удобный пункт выдачи для каждого маркетплейса.</p></section>
+    <div class="delivery-overview">
+      <section class="delivery-city-card" id="city" aria-labelledby="delivery-city-title"><h2 id="delivery-city-title">Город доставки</h2><p class="muted" data-preferences-status>Загружаем настройки доставки…</p><div id="delivery-city-slot"><p class="muted">Загружаем города…</p></div><p class="delivery-feedback" id="delivery-city-status" role="status"></p></section>
+      <section class="delivery-saved-card" aria-labelledby="delivery-saved-title"><h2 id="delivery-saved-title">Ваши пункты выдачи</h2><ul id="delivery-saved-list" class="delivery-saved-list"><li class="muted">Загружаем сохранённые пункты…</li></ul></section>
+    </div>
+    <div id="pickup-page"></div>
+    <noscript><p class="notice">Чтобы сменить город и пункт выдачи, включите JavaScript в браузере.</p></noscript>
+  </main>
+  <footer class="footer"><nav class="footer-contacts" aria-label="Контакты автора"><a href="https://github.com/BasyaZSkot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://t.me/kvakva239" target="_blank" rel="noopener noreferrer">Telegram</a><a href="mailto:vasya.zeldin@gmail.com">Почта</a><a href="mailto:zeldinvasya@gmail.com">Запасная почта</a></nav><span>© MultiMarket</span><a href="/">К поиску товаров</a></footer>
+</body>
+</html>

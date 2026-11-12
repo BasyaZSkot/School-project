@@ -3,33 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f4f6fb">
-  <title>Мониторинг — MultiMarket</title>
+  <meta name="theme-color" content="#fafafa">
+  <title>Мои товары — MultiMarket</title>
+  <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
+  <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/session.js" defer></script>
+  <script src="/static/library-data.js" defer></script>
+  <script src="/static/collections.js" defer></script>
   <script src="/static/monitoring.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark">M</span><span>Multi<span class="brand-accent">Market</span></span></a>
+    <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
     <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a class="active" href="/monitoring">Мониторинг</a>
-      <a href="/history">История цен</a><a href="/sources">Источники</a>
+      <a href="/">Поиск</a><a class="active" aria-current="page" href="/monitoring">Мои товары</a>
+      <a href="/history">История цен</a>
     </nav>
-    <a class="top-action" href="/">Найти товар</a>
+    <a class="top-action" href="/account">Аккаунт</a>
   </header>
-  <main class="page">
+  <main class="page" id="main-content">
     <section class="page-intro page-intro-compact">
-      <div class="eyebrow"><span class="eyebrow-dot"></span> МОИ ТОВАРЫ</div>
-      <h1>Мониторинг цен</h1>
-      <p>Следи за изменением цены и переходи к истории каждого товара.</p>
+      <h1>Мои товары</h1>
+      <p>Сохранённые товары и изменения их цен в одном месте.</p>
     </section>
     <div class="section-toolbar">
-      <div><h2>Отслеживаемые товары</h2><p class="muted">Добавляй товары кнопкой «Следить за ценой» на странице поиска.</p></div>
-      <div class="toolbar-actions"><a class="button button-secondary" href="/api/monitors/export.csv">Экспорт CSV</a><button class="button button-primary" id="refresh-monitors" type="button">Обновить</button></div>
+      <div><h2>Отслеживаемые товары</h2><p class="muted">Добавьте товар из поиска — мы будем проверять его цену.</p></div>
+      <div class="toolbar-actions"><a class="button button-primary" href="/">Найти товар</a><a class="button button-secondary" href="/api/monitors/export.csv">Экспорт CSV</a><button class="button button-secondary" id="refresh-monitors" type="button">Обновить</button></div>
     </div>
     <div id="page-message" class="notice" hidden><span class="notice-icon">i</span><p></p></div>
     <div id="monitor-list" class="monitor-list"><div class="loading-card">Загружаем товары…</div></div>
   </main>
-  <footer class="footer"><span>© MultiMarket</span><a href="/sources">О подключении источников данных</a></footer>
+  <footer class="footer"><nav class="footer-contacts" aria-label="Контакты автора"><a href="https://github.com/BasyaZSkot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://t.me/kvakva239" target="_blank" rel="noopener noreferrer">Telegram</a><a href="mailto:vasya.zeldin@gmail.com">Почта</a><a href="mailto:zeldinvasya@gmail.com">Запасная почта</a></nav><span>© MultiMarket</span><a href="/sources">О сервисе</a></footer>
 </body>
 </html>

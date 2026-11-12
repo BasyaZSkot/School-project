@@ -7,6 +7,10 @@ from urllib.parse import parse_qsl, quote_plus, urlencode, urljoin, urlparse, ur
 from .base import MAX_PROVIDER_LIMIT, Offer, ProviderResult, SearchStatus
 from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter, _price_from_offer
+from .product_data import MAX_SPECIFICATIONS, delivery_data, image_urls
+from .yandex_delivery import extract_yandex_deliveries
+from .regions import regional_url
+from .yandex_about import extract_yandex_about
 
 
 MAX_SEARCH_PAGES = 50
@@ -28,7 +32,7 @@ def _merge_specifications(*groups):
                 continue
             merged.append({"name": name[:120], "value": value[:500]})
             seen.add(identity)
-            if len(merged) >= 30:
+            if len(merged) >= MAX_SPECIFICATIONS:
                 return merged
     return merged
 
@@ -111,12 +115,23 @@ class _YandexProductStateParser(HTMLParser):
         self.values = {}
         self.specifications = []
         self._spec_row = None
+        self.images = []
+        self._gallery_depth = None
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
         attrs = dict(attrs)
         depth = len(self._tags) + 1
         target = attrs.get("data-auto")
+        zone = (attrs.get("data-zone-name", "") + " " + str(target or "")).casefold()
+        if any(name in zone for name in ("productgallery", "product-gallery", "product-picture", "product-image", "media-viewer")):
+            self._gallery_depth = depth
+        if tag == "meta" and attrs.get("property") == "og:image":
+            self.images.append(attrs.get("content"))
+        if tag == "img" and (self._gallery_depth is not None or attrs.get("itemprop") == "image"):
+            self.images.append(attrs.get("src") or attrs.get("data-src"))
+        if target in {"delivery", "delivery-text", "snippet-delivery", "delivery-estimate"}:
+            self._captures.append({"tag": tag, "depth": depth, "target": "delivery", "parts": []})
 
         # In the public product markup the value is the second direct child of
         # the row three levels above span[data-auto="product-spec"].
@@ -175,6 +190,8 @@ class _YandexProductStateParser(HTMLParser):
         if close_index is None:
             return
         depth = close_index + 1
+        if self._gallery_depth is not None and depth <= self._gallery_depth:
+            self._gallery_depth = None
         remaining = []
         for capture in self._captures:
             if capture["tag"] == tag and capture["depth"] == depth:
@@ -223,7 +240,7 @@ class _YandexProductStateParser(HTMLParser):
             for item in self.specifications
         ):
             return
-        if len(self.specifications) < 30:
+        if len(self.specifications) < MAX_SPECIFICATIONS:
             self.specifications.append({"name": name, "value": value})
 
 
@@ -233,6 +250,8 @@ class _YandexSearchCardsParser(HTMLParser):
     _text_targets = {
         "snippet-title": "title",
         "snippet-price-current": "price",
+        "snippet-delivery": "delivery",
+        "delivery-estimate": "delivery",
     }
 
     def __init__(self):
@@ -257,6 +276,7 @@ class _YandexSearchCardsParser(HTMLParser):
                 "price": [],
                 "url": None,
                 "image_url": None,
+                "delivery": [],
             }
         elif self._card is not None:
             field = self._text_targets.get(target)
@@ -341,6 +361,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
         parser = _YandexSearchCardsParser()
         parser.feed(html)
         parser.close()
+        deliveries, _ = extract_yandex_deliveries(html)
 
         offers = []
         seen = set()
@@ -381,11 +402,24 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
                 url=product_url,
                 external_id=product_id,
                 image_url=image_url,
+                image_urls=image_urls(image_url),
+                delivery=deliveries.get(parsed_url.path.rstrip("/")) or (delivery_data(card["delivery"][0]) if card["delivery"] else {}),
             ))
             if len(offers) >= limit:
-                return offers
+                break
 
-        return offers if offers else super()._extract(html, page_url, limit)
+        structured = super()._extract(html, page_url, limit)
+        if not offers:
+            return structured
+        by_path = {urlparse(item.url).path.rstrip("/"): item for item in structured}
+        for offer in offers:
+            extra = by_path.get(urlparse(offer.url).path.rstrip("/"))
+            if extra is not None:
+                for name in ("brand", "model", "rating", "review_count", "specifications", "reviews", "delivery", "image_urls"):
+                    value = getattr(extra, name)
+                    if value is not None and value != [] and value != {}:
+                        setattr(offer, name, {**value, **offer.delivery} if name == "delivery" else value)
+        return offers
 
     @staticmethod
     def _is_challenge_page(page_url: str, html: str) -> bool:
@@ -401,7 +435,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             raise ValueError(f"limit must be between 1 and {MAX_PROVIDER_LIMIT}")
 
         clean_query = " ".join(query.split())
-        search_url = self.search_url.format(query=quote_plus(clean_query))
+        search_url = regional_url(self.search_url.format(query=quote_plus(clean_query)))
         final_url, html = await self._fetch_public_page(search_url)
         if self._is_challenge_page(final_url, html):
             return ProviderResult(
@@ -478,6 +512,9 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
         parser = _YandexProductStateParser()
         parser.feed(html)
         parser.close()
+        _, primary_delivery = extract_yandex_deliveries(html)
+        about = extract_yandex_about(html)
+        parser.specifications = _merge_specifications(about["specifications"], parser.specifications)
         titles = parser.values.get("productCardTitle", [])
         current_prices = parser.values.get("snippet-price-current", [])
         title = titles[0] if titles else None
@@ -491,9 +528,18 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             structured.specifications = _merge_specifications(
                 parser.specifications, structured.specifications
             )
+            structured.image_urls = image_urls([structured.image_urls, parser.images], page_url)
+            structured.image_url = structured.image_url or next(iter(structured.image_urls), None)
+            if not structured.delivery and parser.values.get("delivery"):
+                structured.delivery = delivery_data(parser.values["delivery"][0])
+            structured.delivery = {**structured.delivery, **primary_delivery}
+            structured.description = about["description"] or structured.description
         if not title or price is None:
+            if structured is not None:
+                from .variants import extract
+                structured.variants=extract(structured.title,structured.specifications,brand=structured.brand,model=structured.model,condition=structured.condition)
             return structured
-        product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
+        product_id = re.search(r"/(\d+)/?$", urlparse(page_url).path)
         offer = Offer(
             marketplace=self.marketplace,
             title=title,
@@ -509,8 +555,17 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             offer.specifications = structured.specifications
             offer.reviews = structured.reviews
             offer.image_url = structured.image_url
+            offer.image_urls = structured.image_urls
+            offer.delivery = structured.delivery
+            offer.brand=structured.brand;offer.model=structured.model;offer.seller=structured.seller;offer.condition=structured.condition;offer.gtin=structured.gtin
         else:
             offer.specifications = parser.specifications
+            offer.description = about["description"]
+            offer.image_urls = image_urls(parser.images, page_url)
+            offer.image_url = next(iter(offer.image_urls), None)
+            offer.delivery = primary_delivery or delivery_data(parser.values.get("delivery", [None])[0])
+        from .variants import extract
+        offer.variants=extract(offer.title,offer.specifications,brand=offer.brand,model=offer.model,condition=offer.condition)
         return offer
 
     @classmethod

@@ -28,6 +28,7 @@ from typing import Callable
 from urllib.parse import urlparse
 
 import httpx
+from .regions import current_region
 
 logger = logging.getLogger("multimarket.transport")
 
@@ -492,9 +493,18 @@ class ResilientFetcher:
 
 
 _shared: ResilientFetcher | None = None
+_regional_shared: dict[int, ResilientFetcher] = {}
 
 
 def get_shared_fetcher() -> ResilientFetcher:
+    region = current_region()
+    if region:
+        key = region["id"]
+        fetcher = _regional_shared.pop(key, None) or ResilientFetcher(FetcherConfig.from_env())
+        _regional_shared[key] = fetcher
+        if len(_regional_shared) > 8:
+            del _regional_shared[next(iter(_regional_shared))]
+        return fetcher
     """Process-wide fetcher so rate limits, cookies and proxy state are shared."""
     global _shared
     if _shared is None:

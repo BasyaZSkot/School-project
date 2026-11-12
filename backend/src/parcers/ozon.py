@@ -3,6 +3,7 @@ import os
 from .embedded_state import extract_ozon_embedded, extract_ozon_product
 from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter
+from .product_data import image_urls
 
 
 class OzonAdapter(PublicHtmlSearchAdapter):
@@ -28,12 +29,14 @@ class OzonAdapter(PublicHtmlSearchAdapter):
         if embedded is None:
             return structured
         if structured is not None:
-            embedded.description = structured.description
-            embedded.rating = structured.rating
-            embedded.review_count = structured.review_count
+            embedded.description = embedded.description or structured.description
+            embedded.rating = embedded.rating if embedded.rating is not None else structured.rating
+            embedded.review_count = embedded.review_count if embedded.review_count is not None else structured.review_count
             embedded.specifications = embedded.specifications or structured.specifications
             embedded.reviews = embedded.reviews or structured.reviews
             embedded.image_url = embedded.image_url or structured.image_url
+            embedded.image_urls = image_urls([embedded.image_urls, structured.image_urls])
+            embedded.delivery = embedded.delivery or structured.delivery
         return embedded
 
     @classmethod
