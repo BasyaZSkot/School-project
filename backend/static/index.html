@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/catalog.js" defer></script>
   <script src="/static/region.js" defer></script>
+  <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/pickup.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -35,6 +37,7 @@
     </section>
 
     <div class="search-settings" id="delivery-region"><button id="region-open" class="region-button" type="button" aria-haspopup="dialog" disabled>Город доставки: <span data-region-label>Регион площадки</span> <span aria-hidden="true">⌄</span></button><span class="muted">Для расчёта сроков доставки</span></div>
+    <div class="pickup-preference"><button class="pickup-open secondary-button" type="button" data-pickup-open aria-haspopup="dialog">Выбрать пункт выдачи</button><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
     <form class="search-form" id="search-form" role="search">
       <label class="sr-only" for="search-input">Название товара</label>
       <svg class="search-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>

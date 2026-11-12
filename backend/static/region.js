@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   const KEY = "multimarket.region.v1";
-  let cities = [], selected = null, automaticName = "";
+  let cities = [], selected = null, automaticName = "", automaticId = null;
   const $ = selector => document.querySelector(selector);
   const normalize = text => String(text || "").toLocaleLowerCase("ru").replace(/ё/g,"е").replace(/[^a-zа-я0-9]/g,"");
   function readChoice() {
@@ -37,7 +37,9 @@
   function observeOffers(offers) {
     if (selected === null) {
       automaticName = offers.find(o => o.delivery?.destination)?.delivery.destination || "";
+      automaticId = offers.find(o => cities.some(c => c.id === o.delivery?.region_id))?.delivery.region_id || cities.find(c => normalize(c.name) === normalize(automaticName))?.id || null;
       updateLabels();
+      window.MultiMarketPickup?.refresh();
     }
   }
   function scopeDelivery(delivery) {
@@ -71,5 +73,5 @@
     await ready; const id = readChoice().id;
     if (valid(id) && id !== selected) {selected=id;updateLabels();document.dispatchEvent(new CustomEvent("multimarket:regionchange",{detail:{id}}));}
   });
-  window.MultiMarketRegion = {ready,getId:()=>selected,getName:name,observeOffers,scopeDelivery};
+  window.MultiMarketRegion = {ready,getId:()=>selected,getEffectiveId:()=>selected || automaticId,getCities:()=>cities.slice(),select:choose,getName:name,observeOffers,scopeDelivery};
 })();

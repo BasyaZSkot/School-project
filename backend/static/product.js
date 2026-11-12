@@ -189,6 +189,7 @@ function updateSourceSelect() {
   const select = $("#product-source"); select.replaceChildren();
   sources.forEach((o,i) => select.append(new Option(o.marketplace,String(i))));
   select.value = String(selectedSource); $("#product-source-toolbar").hidden = !sources.length;
+  window.MultiMarketPickup?.refresh();
 }
 async function loadProduct() {
   const product = readProduct();

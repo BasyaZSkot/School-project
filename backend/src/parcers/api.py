@@ -20,6 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import accounts, monitoring, oauth
 from .service import MarketplaceSearchService, PROVIDER_FETCH_CAP
 from .regions import REGIONS, get_region
+from .pickup import pickup_service, yandex_keys
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 STATIC_DIR = BACKEND_DIR / "static"
@@ -361,6 +362,41 @@ async def update_user_role(user_id: str, payload: AdminRoleUpdate, request: Requ
 @app.get("/api/regions")
 async def regions():
     return {"regions": REGIONS}
+
+
+@app.get("/api/pickup-points")
+async def pickup_points(
+    region_id: int = Query(ge=1, le=1000000),
+    marketplace: str = Query(min_length=1, max_length=30),
+    lat: float | None = Query(default=None, ge=-85, le=85),
+    lon: float | None = Query(default=None, ge=-180, le=180),
+    radius: float = Query(default=4, ge=.5, le=6),
+):
+    try:
+        return await pickup_service.points(region_id, marketplace, lat, lon, radius)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc), headers={"Retry-After": "30"}) from exc
+
+
+@app.get("/api/map-config")
+async def map_config(response: Response):
+    keys = yandex_keys()
+    response.headers["Cache-Control"] = "no-store"
+    # JS API keys are designed for the browser. Never return the server suggest key.
+    return {"provider":"yandex", "api_key": keys["YANDEX_MAPS_API_KEY"],
+            "yandex_suggest": bool(keys["YANDEX_MAPS_API_KEY"] and keys["YANDEX_SUGGEST_API_KEY"])}
+
+
+@app.get("/api/address-suggestions")
+async def address_suggestions(region_id: int = Query(ge=1, le=1000000), q: str = Query(min_length=3, max_length=160)):
+    try:
+        return await pickup_service.suggest(region_id, q)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc), headers={"Retry-After": "30"}) from exc
 
 
 @app.get("/api/search")

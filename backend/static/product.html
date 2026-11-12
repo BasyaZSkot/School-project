@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/catalog.js" defer></script>
   <script src="/static/region.js" defer></script>
+  <script src="/static/pickup-data.js" defer></script>
+  <script src="/static/pickup.js" defer></script>
   <script src="/static/product.js" defer></script>
 </head>
 <body>
@@ -29,6 +31,7 @@
   <main class="page" id="main-content">
     <a class="back-link" href="/">← Вернуться к поиску</a>
     <p class="product-region">Город доставки: <span data-region-label>Регион площадки</span> <a href="/#delivery-region">Изменить</a></p>
+    <div class="pickup-preference"><button class="pickup-open secondary-button" type="button" data-pickup-open aria-haspopup="dialog">Выбрать пункт выдачи</button><span data-pickup-summary class="muted">Отдельно для каждого маркетплейса</span></div>
     <section class="product-detail-hero">
       <div id="product-image-wrap" class="product-detail-image-wrap" hidden>
         <button id="gallery-open" class="gallery-main" type="button" aria-label="Увеличить фото товара"><img id="product-image" class="product-detail-image" alt=""></button>
