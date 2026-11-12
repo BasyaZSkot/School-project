@@ -50,3 +50,38 @@ test('high rating and fast delivery badges require supporting data', () => {
   assert.deepEqual(C.badges(offer({rating:5,review_count:1})),[]);
   assert.deepEqual(C.badges(offer({rating:4.8,review_count:10,delivery:{max_days:2}})),['Быстрая доставка','Высокая оценка']);
 });
+const futureDate = days => {
+  const d = new Date();
+  return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()+days)).toISOString().slice(0,10);
+};
+test('delivery filters use the last date in a range, not its first date', () => {
+  const slow={title:'Range',offers:[offer({delivery:{earliest_date:futureDate(1),latest_date:futureDate(13)}})]};
+  const fast={title:'Soon',offers:[offer({delivery:{earliest_date:futureDate(2),latest_date:futureDate(3)}})]};
+  assert.deepEqual(C.filterProducts([slow,fast],{delivery:'3'}).map(p=>p.title),['Soon']);
+  assert.deepEqual(C.sortProducts([slow,fast],'delivery').map(p=>p.title),['Soon','Range']);
+});
+test('known delivery accepts an explicit start but does not invent its upper bound', () => {
+  const o=offer({delivery:{earliest_date:futureDate(2)}});
+  assert.equal(C.hasDeliveryEstimate(o),true);
+  assert.equal(C.deliveryDays(o),Infinity);
+  assert.equal(C.filterProducts([{offers:[o]}],{delivery:'known'}).length,1);
+  assert.equal(C.filterProducts([{offers:[o]}],{delivery:'3'}).length,0);
+});
+test('partial or stale delivery never qualifies as known or fast', () => {
+  const partial=offer({delivery:{text:'В пути до 2 дней',partial:true,max_days:2}});
+  const stale=offer({delivery:{text:'Завтра',latest_date:'2020-01-01',max_days:1}});
+  assert.equal(C.hasDeliveryEstimate(partial),false);
+  assert.equal(C.hasDeliveryEstimate(stale),false);
+  assert.equal(C.filterProducts([{offers:[partial]},{offers:[stale]}],{delivery:'known'}).length,0);
+});
+test('relative wording from yesterday is displayed as its actual date', () => {
+  const o=offer({delivery:{text:'Послезавтра, ПВЗ',earliest_date:'2026-11-14',latest_date:'2026-11-14',method:'Пункт выдачи'}});
+  const label=C.deliveryLabel(o,new Date(2026,10,13));
+  assert.match(label,/14 ноября/);
+  assert.doesNotMatch(label,/Послезавтра/);
+  assert.match(label,/Пункт выдачи/);
+  assert.match(C.deliveryLabel(o,new Date(2026,10,15)),/устарел/);
+});
+test('invalid ISO dates are rejected instead of overflowing into a later month', () => {
+  assert.equal(C.deliveryDays(offer({delivery:{latest_date:'2027-02-31'}}),new Date(2027,1,1)),Infinity);
+});

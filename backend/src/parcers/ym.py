@@ -8,6 +8,7 @@ from .base import MAX_PROVIDER_LIMIT, Offer, ProviderResult, SearchStatus
 from .feed import JsonFeedAdapter
 from .public_html import PublicHtmlSearchAdapter, _price_from_offer
 from .product_data import MAX_SPECIFICATIONS, delivery_data, image_urls
+from .yandex_delivery import extract_yandex_deliveries
 
 
 MAX_SEARCH_PAGES = 50
@@ -358,6 +359,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
         parser = _YandexSearchCardsParser()
         parser.feed(html)
         parser.close()
+        deliveries, _ = extract_yandex_deliveries(html)
 
         offers = []
         seen = set()
@@ -399,7 +401,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
                 external_id=product_id,
                 image_url=image_url,
                 image_urls=image_urls(image_url),
-                delivery=delivery_data(card["delivery"][0]) if card["delivery"] else {},
+                delivery=deliveries.get(parsed_url.path.rstrip("/")) or (delivery_data(card["delivery"][0]) if card["delivery"] else {}),
             ))
             if len(offers) >= limit:
                 break
@@ -414,7 +416,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
                 for name in ("brand", "model", "rating", "review_count", "specifications", "reviews", "delivery", "image_urls"):
                     value = getattr(extra, name)
                     if value is not None and value != [] and value != {}:
-                        setattr(offer, name, value)
+                        setattr(offer, name, {**value, **offer.delivery} if name == "delivery" else value)
         return offers
 
     @staticmethod
@@ -508,6 +510,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
         parser = _YandexProductStateParser()
         parser.feed(html)
         parser.close()
+        _, primary_delivery = extract_yandex_deliveries(html)
         titles = parser.values.get("productCardTitle", [])
         current_prices = parser.values.get("snippet-price-current", [])
         title = titles[0] if titles else None
@@ -525,6 +528,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             structured.image_url = structured.image_url or next(iter(structured.image_urls), None)
             if not structured.delivery and parser.values.get("delivery"):
                 structured.delivery = delivery_data(parser.values["delivery"][0])
+            structured.delivery = {**structured.delivery, **primary_delivery}
         if not title or price is None:
             return structured
         product_id = re.search(r"/card/([^/]+)", urlparse(page_url).path)
@@ -549,7 +553,7 @@ class YandexMarketAdapter(PublicHtmlSearchAdapter):
             offer.specifications = parser.specifications
             offer.image_urls = image_urls(parser.images, page_url)
             offer.image_url = next(iter(offer.image_urls), None)
-            offer.delivery = delivery_data(parser.values.get("delivery", [None])[0])
+            offer.delivery = primary_delivery or delivery_data(parser.values.get("delivery", [None])[0])
         return offer
 
     @classmethod

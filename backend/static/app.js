@@ -415,7 +415,7 @@ function saveSearchState() {
   if (!savedResponse) return;
   try {
     sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-      version: 1, query: activeQuery, data: savedResponse,
+      version: 2, query: activeQuery, data: savedResponse,
       displayed: displayedProductCount, scrollY: window.scrollY, filters:readFilters()
     }));
   } catch { /* Browsing also works when storage is unavailable or full. */ }
@@ -423,8 +423,14 @@ function saveSearchState() {
 function restoreSearchState() {
   try {
     const state = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || "null");
-    if (!state || state.version !== 1 || typeof state.query !== "string" ||
+    if (!state || ![1,2].includes(state.version) || typeof state.query !== "string" ||
         !Array.isArray(state.data?.products) || !Number.isInteger(state.displayed)) return;
+    if (state.version === 1) {
+      runSearch(state.query).then(() => {
+        if (savedResponse) {populateFilters(state.filters); applyFilters(state.displayed);}
+      });
+      return;
+    }
     savedResponse = state.data;
     activeQuery = state.query;
     input.value = activeQuery;

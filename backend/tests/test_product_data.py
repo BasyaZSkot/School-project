@@ -84,7 +84,8 @@ class RichProductDataTests(unittest.TestCase):
             '<div data-auto="delivery-estimate">Доставка 15 ноября</div>')
         offer = adapter._extract_product(html, "https://market.yandex.ru/card/item/123")
         self.assertEqual(offer.image_urls, ["https://cdn.example/one", "https://cdn.example/two"])
-        self.assertEqual(offer.delivery, {"text": "Доставка 15 ноября"})
+        self.assertEqual(offer.delivery["text"], "Доставка 15 ноября")
+        self.assertTrue(offer.delivery["latest_date"].endswith("-11-15"))
 
     def test_search_and_details_api_preserve_enriched_fields(self):
         offer = Offer(marketplace="Ozon", title="Товар", price=100, currency="RUB",

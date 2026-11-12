@@ -9,28 +9,44 @@
         catch { return false; }
       }).slice(0, 20);
   }
+  function dateDay(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const date = new Date(value + "T00:00:00Z");
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0,10) === value ? date.getTime()/86400000 : null;
+  }
+  function todayDay(today) { return Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())/86400000; }
   function deliveryDays(offer, today = new Date()) {
     const d = offer.delivery || {};
-    if (d.latest_date && /^\d{4}-\d{2}-\d{2}$/.test(d.latest_date)) {
-      const end = new Date(d.latest_date + "T00:00:00");
-      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const days = Math.round((end - start) / 86400000);
-      return Number.isFinite(days) && days >= 0 ? days : Infinity;
+    if (d.partial) return Infinity;
+    if (d.latest_date) {
+      const end = dateDay(d.latest_date);
+      const days = end === null ? -1 : end - todayDay(today);
+      return days >= 0 ? days : Infinity;
     }
     return typeof d.max_days === "number" && Number.isFinite(d.max_days) && d.max_days >= 0
-      ? d.max_days : Infinity;
+      && d.max_days <= 365 ? d.max_days : Infinity;
   }
-  function deliveryLabel(offer) {
+  function hasDeliveryEstimate(offer, today = new Date()) {
+    const d = offer.delivery || {};
+    if (d.partial) return false;
+    if (d.latest_date) return deliveryDays(offer,today) !== Infinity;
+    const start = dateDay(d.earliest_date);
+    return deliveryDays(offer,today) !== Infinity || start !== null && start >= todayDay(today);
+  }
+  function deliveryLabel(offer, today = new Date()) {
     const d = offer.delivery || {};
     let text = "Срок уточните в магазине";
-    if (d.text) text = d.text;
-    else if (d.latest_date) {
-      const format = value => new Date(value + "T00:00:00").toLocaleDateString("ru-RU", {day:"numeric", month:"long"});
-      if (deliveryDays(offer) !== Infinity) {
-        text = d.earliest_date && d.earliest_date !== d.latest_date
+    const format = value => new Date(value + "T00:00:00Z").toLocaleDateString("ru-RU", {day:"numeric",month:"long",timeZone:"UTC"});
+    if (d.latest_date) {
+      if (deliveryDays(offer,today) !== Infinity) {
+        text = dateDay(d.earliest_date) !== null && d.earliest_date !== d.latest_date
           ? format(d.earliest_date) + " — " + format(d.latest_date) : format(d.latest_date);
-      }
-    } else if (typeof d.max_days === "number") {
+        if (d.method) text += " · " + d.method;
+      } else text = "Срок устарел или недоступен — уточните в магазине";
+    } else if (dateDay(d.earliest_date) !== null && dateDay(d.earliest_date) >= todayDay(today)) {
+      text = "Не раньше " + format(d.earliest_date);
+    } else if (d.text) text = d.text;
+    else if (deliveryDays(offer,today) !== Infinity) {
       text = typeof d.min_days === "number" && d.min_days !== d.max_days
         ? d.min_days + "–" + d.max_days + " дн." : "До " + d.max_days + " дн.";
     }
@@ -75,8 +91,8 @@
         if (filters.rating && Number(offer.rating || 0) < Number(filters.rating)) return false;
         if (filters.currency && currency(offer) !== filters.currency) return false;
         if (hasPrice && (!validPrice(offer) || Number(offer.price) < min || Number(offer.price) > max)) return false;
-        if (filters.delivery && (offer.in_stock === false || deliveryDays(offer) === Infinity ||
-            filters.delivery !== "known" && deliveryDays(offer) > Number(filters.delivery))) return false;
+        if (filters.delivery && (offer.in_stock === false || (filters.delivery === "known"
+          ? !hasDeliveryEstimate(offer) : deliveryDays(offer) > Number(filters.delivery)))) return false;
         return true;
       });
       return offers.length ? [{...product, offers, sourceOffers:product.offers}] : [];
@@ -99,7 +115,7 @@
     }
     return list;
   }
-  const api = {images, currency, validPrice, deliveryDays, deliveryLabel, bestOffers, badges, filterProducts, sortProducts};
+  const api = {images, currency, validPrice, deliveryDays, deliveryLabel, hasDeliveryEstimate, bestOffers, badges, filterProducts, sortProducts};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MultiMarketCatalog = api;
 })(typeof window === "undefined" ? globalThis : window);

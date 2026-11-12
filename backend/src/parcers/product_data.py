@@ -1,8 +1,9 @@
 """Bounded normalization of product media and published delivery estimates."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 import math
+import re
 from urllib.parse import urljoin, urlparse
 
 MAX_IMAGES = 20
@@ -48,15 +49,58 @@ def _days(value):
         return None
 
 
-def delivery_data(value) -> dict:
+def _delivery_dates(text: str, reference: date) -> dict:
+    text = " ".join(text.casefold().replace("ё", "е").split())
+    relative = {"сегодня": 0, "завтра": 1, "послезавтра": 2}
+    days = [offset for word, offset in relative.items() if re.search(r"\b" + word + r"\b", text)]
+    if days:
+        return {"earliest_date": (reference + timedelta(days=min(days))).isoformat(),
+                "latest_date": (reference + timedelta(days=max(days))).isoformat()}
+    dash = r"[-–—‐‑‒−]"
+    duration = re.search(r"\b(\d{1,3})(?:\s*" + dash + r"\s*(\d{1,3}))?\s*(?:дн(?:я|ей|ь|\.)?|суток)\b", text)
+    if duration:
+        lo, hi = int(duration[1]), int(duration[2] or duration[1])
+        if 0 <= lo <= hi <= 365:
+            return {"min_days": lo, "max_days": hi}
+    months = {"янв": 1, "фев": 2, "мар": 3, "апр": 4, "мая": 5, "май": 5,
+              "июн": 6, "июл": 7, "авг": 8, "сен": 9, "окт": 10, "ноя": 11, "дек": 12}
+    matches = list(re.finditer(r"\b(\d{1,2})(?:\s*" + dash + r"\s*(\d{1,2}))?\s+(" + "|".join(months) + r")[а-я]*\.?\s*(\d{4})?", text))
+    if not matches:
+        return {}
+    match = matches[0]
+    lo, hi, month = int(match[1]), int(match[2] or match[1]), months[match[3]]
+    year = int(match[4]) if match[4] else reference.year + (reference.month == 12 and month <= 2)
+    try:
+        earliest, latest = date(year, month, lo), date(year, month, hi)
+    except ValueError:
+        return {}
+    if len(matches) > 1 and re.fullmatch(r"\s*" + dash + r"\s*", text[match.end():matches[1].start()]):
+        end = matches[1]
+        end_month = months[end[3]]
+        end_year = int(end[4]) if end[4] else year + (month == 12 and end_month == 1)
+        try:
+            latest = date(end_year, end_month, int(end[2] or end[1]))
+        except ValueError:
+            return {}
+    if earliest > latest:
+        return {}
+    # "С 15 ноября" supplies a start, not a latest-arrival promise.
+    if re.search(r"\b(?:с|от|не раньше)\s+" + re.escape(match[0]), text) and not match[2]:
+        return {"earliest_date": earliest.isoformat()}
+    return {"earliest_date": earliest.isoformat(), "latest_date": latest.isoformat()}
+
+
+def delivery_data(value, *, reference_date: date | None = None) -> dict:
     """Accept explicit feed estimates; never infer a promise from a product price."""
     if isinstance(value, str):
         text = " ".join(value.split())[:240]
-        return {"text": text} if text else {}
+        value = {"text": text} if text else {}
     if not isinstance(value, dict):
         return {}
     result = {}
-    for key in ("text", "destination"):
+    if value.get("partial") is True:
+        result["partial"] = True
+    for key in ("text", "destination", "method"):
         if isinstance(value.get(key), str) and value[key].strip():
             result[key] = " ".join(value[key].split())[:240]
     for key in ("min_days", "max_days"):
@@ -74,6 +118,13 @@ def delivery_data(value) -> dict:
     if result.get("earliest_date", "") > result.get("latest_date", "9999"):
         result.pop("earliest_date", None)
         result.pop("latest_date", None)
+    if result.get("text") and not result.get("partial") and not (result.get("earliest_date") or result.get("latest_date")):
+        reference = reference_date or datetime.now(timezone(timedelta(hours=3))).date()
+        inferred = _delivery_dates(result["text"], reference)
+        for key, val in inferred.items():
+            result.setdefault(key, val)
+        if inferred:
+            result["observed_on"] = reference.isoformat()
     try:
         amount = float(value["cost"])
         currency = str(value.get("currency") or "").upper()
@@ -109,6 +160,7 @@ def schema_delivery(offer: dict) -> dict:
                     if maximum is not None:
                         label = "В пути" if isinstance(timing.get("transitTime"), dict) else "Подготовка к отправке"
                         raw["text"] = f"{label}: до {maximum} дн. Полный срок — в магазине."
+                        raw["partial"] = True
         region = entry.get("shippingDestination")
         if isinstance(region, dict):
             raw["destination"] = region.get("addressRegion") or region.get("addressCountry")
