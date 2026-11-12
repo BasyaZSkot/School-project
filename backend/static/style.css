@@ -550,3 +550,8 @@ summary:hover { color: var(--accent); }
 .product-spec-table dt { display: block; flex: 0 1 auto; max-width: 62%; min-width: 0; }
 .product-spec-table dt::after { content: none; }
 .product-spec-table dd { order: 2; flex: 0 1 auto; max-width: 48%; min-width: 0; }
+
+.footer { flex-wrap:wrap; align-items:center; }
+.footer-contacts { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; }
+.footer-contacts a { padding:6px 0; }
+.footer-contacts a:hover { color:var(--accent); text-decoration:underline; }
