@@ -112,7 +112,6 @@ h3 { font-size: 17px; font-weight: 600; }
 .search-form input::placeholder { color: #72747e; }
 .search-form button { min-width: 108px; min-height: 48px; padding: 12px 20px; border: 0; border-radius: 7px; color: white; background: var(--accent); font-size: 15px; font-weight: 600; }
 .search-form button:hover { background: var(--accent-dark); }
-.search-help { margin: 8px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
 .search-guide { max-width: 740px; margin: 48px auto 0; padding: 24px 0; border-top: 1px solid var(--line); text-align: center; }
 .search-guide p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
 .search-guide a { display: inline-flex; align-items: center; min-height: 44px; gap: 12px; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: none; }
