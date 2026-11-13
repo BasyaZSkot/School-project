@@ -62,3 +62,7 @@ html[data-theme=dark] .notification-card { background:var(--paper); color:var(--
 #search-button::before { content:""; display:inline-block; width:17px; height:17px; margin-right:6px; vertical-align:-3px; background:url("/static/icons/emoji/1f50d.svg") center/contain no-repeat; }
 
 html[data-theme=dark] .search-form button { color:#17171e; }
+#search-sticky-marker { height:0; }
+.search-form { position:sticky; top:var(--search-sticky-top, 120px); z-index:19; transition:width .2s ease, box-shadow .2s ease; }
+.search-form.search-form-stuck { width:100%; box-shadow:0 8px 24px #0003; }
+@media (prefers-reduced-motion:reduce) { .search-form { transition:none; } }

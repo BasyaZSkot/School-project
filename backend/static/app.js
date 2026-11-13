@@ -30,6 +30,25 @@ const loadedProductIds = new Set();
 const MAX_BUFFERED_RESULTS = 200;
 const DISPLAY_BATCH_SIZE = 20;
 
+// Keep the same working form visible below the actual navigation height.
+const searchMarker = document.querySelector("#search-sticky-marker");
+const searchHeader = document.querySelector(".topbar");
+let stickyFrame = 0;
+function updateStickySearch() {
+  stickyFrame = 0;
+  if (!searchMarker || !searchHeader) return;
+  const height = searchHeader.getBoundingClientRect().height;
+  form.style.setProperty("--search-sticky-top", height + "px");
+  form.classList.toggle("search-form-stuck", searchMarker.getBoundingClientRect().top <= height);
+}
+function queueStickySearch() {
+  if (!stickyFrame) stickyFrame = requestAnimationFrame(updateStickySearch);
+}
+window.addEventListener("scroll", queueStickySearch, {passive:true});
+window.addEventListener("resize", queueStickySearch);
+if (window.ResizeObserver && searchHeader) new ResizeObserver(queueStickySearch).observe(searchHeader);
+queueStickySearch();
+
 const providerMeta = {
   "Ozon": { logo: "O", className: "ozon-logo" },
   "Wildberries": { logo: "WB", className: "wb-logo" },
