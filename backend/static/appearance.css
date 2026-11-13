@@ -1,0 +1,23 @@
+.theme-switch { margin-left:auto; flex-shrink:0; min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; color:var(--ink); background:var(--paper); font:inherit; font-size:13px; cursor:pointer; }
+.view-switch { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:12px 0 16px; color:var(--muted); font-size:14px; }
+.view-switch select { min-height:42px; max-width:100%; padding:8px 30px 8px 12px; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px; font:inherit; }
+html[data-search-view=compact] .offers-list { grid-template-columns:repeat(3,minmax(0,1fr)); }
+html[data-search-view=compact] .offer-card { padding:16px; gap:12px; }
+html[data-search-view=compact] .offer-product-head { gap:12px; min-height:90px; }
+html[data-search-view=compact] .offer-product-image { width:78px; height:78px; flex-basis:78px; }
+html[data-search-view=compact] .offer-product-head h3 { font-size:14px; }
+html[data-search-view=list] .offers-list { grid-template-columns:1fr; }
+html[data-search-view=list] .offer-product-head { min-height:100px; }
+html[data-search-view=list] .offer-product-image { width:100px; height:100px; flex-basis:100px; }
+html[data-product-view=compact] .product-offer-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+html[data-product-view=compact] .product-offer-card { flex-direction:column; align-items:flex-start; padding:16px; gap:12px; }
+html[data-product-view=list] .product-offer-list { display:grid; gap:0; }
+html[data-product-view=list] .product-offer-card { border-radius:0; border-width:0 0 1px; padding:12px 4px; background:transparent; }
+html[data-theme=dark] { color-scheme:dark; --ink:#f0eff7; --muted:#b8b7c5; --line:#42414e; --paper:#24232c; --bg:#17171e; --accent:#aaa3ff; --accent-dark:#d0ccff; --soft:#353244; }
+html[data-theme=dark] :is(.favorite-card,.comparison-scroll,.comparison-table th:first-child,.product-offer-card,.product-source-toolbar,.gallery-dialog,.gallery-thumb,.gallery-main,.source-alert,.source-card code,.pickup-suggestions,.pickup-footer,.offer-open,.watch-button,.load-more-button,.admin-role-select,.history-filters select,.password-form input,.delivery-city-card select,.pickup-fields select,.pickup-search-wrap input,.comparison-table select,.product-variant-toolbar select,.catalog-filters input:not([type=checkbox]),.catalog-filters select,.review-toolbar select,.product-source-toolbar select,.detail-input) { background:var(--paper); color:var(--ink); border-color:var(--line); }
+html[data-theme=dark] :is(.comparison-different td,.recommended-offer) { background:#343144; }
+html[data-theme=dark] :is(.best-price-badge,.stock-badge,.product-best-price) { color:#a5e7bd !important; background:#263b31; }
+html[data-theme=dark] :is(.notice,.auth-message) { background:var(--soft); color:var(--ink); }
+html[data-theme=dark] :is(.offer-product-image,.gallery-main,.gallery-thumb) { background:#fff; }
+@media(max-width:800px) { html[data-search-view=compact] .offers-list { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:580px) { .theme-switch { margin:8px 0; } .view-switch { justify-content:space-between; flex-wrap:wrap; } html[data-search-view=compact] .offers-list,html[data-product-view=compact] .product-offer-list { grid-template-columns:1fr; } }
