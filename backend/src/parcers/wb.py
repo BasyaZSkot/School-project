@@ -1,3 +1,4 @@
+from . import wb_requests
 import os
 import re
 
@@ -9,6 +10,9 @@ from .wb_adapter import wb_record_to_offer
 
 class WildberriesAdapter(PublicHtmlSearchAdapter):
     """Wildberries public-page connector with embedded catalog extraction."""
+
+    async def _fetch_public_page(self, url: str) -> tuple[str, str]:
+        return await wb_requests.fetch_public_page(url, self._valid_marketplace_url, self._fetcher)
 
     marketplace = "Wildberries"
     base_search_url = "https://www.wildberries.ru/catalog/0/search.aspx?search={query}"

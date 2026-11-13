@@ -1,3 +1,4 @@
+from . import ozon_requests
 import os
 
 from .embedded_state import extract_ozon_embedded, extract_ozon_product
@@ -8,6 +9,9 @@ from .product_data import image_urls
 
 class OzonAdapter(PublicHtmlSearchAdapter):
     """Ozon public-page connector with embedded search-state extraction."""
+
+    async def _fetch_public_page(self, url: str) -> tuple[str, str]:
+        return await ozon_requests.fetch_public_page(url, self._valid_marketplace_url, self._fetcher)
 
     marketplace = "Ozon"
     base_search_url = "https://www.ozon.ru/search/?text={query}"
