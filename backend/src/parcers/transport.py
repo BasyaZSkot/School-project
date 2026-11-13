@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Callable
+from typing import Awaitable, Callable
 from urllib.parse import urlparse
 
 import httpx
@@ -309,18 +309,24 @@ def looks_like_challenge(text: str) -> bool:
     return any(marker in lowered for marker in CHALLENGE_MARKERS)
 
 
+async def _default_send_get(client, url: str) -> httpx.Response:
+    return await client.get(url)
+
+
 class ResilientFetcher:
     def __init__(
         self,
         config: FetcherConfig | None = None,
         *,
         client_factory: Callable[..., httpx.AsyncClient] | None = None,
+        send_get: Callable[..., Awaitable[httpx.Response]] | None = None,
         sleep=asyncio.sleep,
         clock=time.monotonic,
         rng: random.Random | None = None,
     ):
         self.config = config or FetcherConfig()
         self._client_factory = client_factory or make_client_factory(self.config.impersonate)
+        self._send_get = send_get or _default_send_get
         self._sleep = sleep
         self._clock = clock
         self._rng = rng or random.Random()
@@ -426,7 +432,7 @@ class ResilientFetcher:
             started = self._clock()
             try:
                 async with client:
-                    response = await asyncio.wait_for(client.get(url), timeout=remaining)
+                    response = await asyncio.wait_for(self._send_get(client, url), timeout=remaining)
                     self._cookies[jar_key] = client.cookies
             except (httpx.RequestError, asyncio.TimeoutError) as exc:
                 if isinstance(exc, asyncio.TimeoutError):

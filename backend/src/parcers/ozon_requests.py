@@ -5,12 +5,17 @@ from .transport import FetcherConfig, ResilientFetcher
 _fetchers = {}
 
 
+async def send_get(client, url):
+    """Send this marketplace's GET request; customize request options here."""
+    return await client.get(url)
+
+
 def get_fetcher():
     region = current_region()
     key = region["id"] if region else None
     fetcher = _fetchers.pop(key, None)
     if fetcher is None:
-        fetcher = ResilientFetcher(FetcherConfig.from_env())
+        fetcher = ResilientFetcher(FetcherConfig.from_env(), send_get=send_get)
     _fetchers[key] = fetcher
     if len(_fetchers) > 8:
         del _fetchers[next(iter(_fetchers))]

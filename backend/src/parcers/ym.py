@@ -98,8 +98,6 @@ def _clean_yandex_specification_value(name, raw_value):
 
 class _YandexProductStateParser(HTMLParser):
 
-    async def _fetch_public_page(self, url: str) -> tuple[str, str]:
-        return await ym_requests.fetch_public_page(url, self._valid_marketplace_url, self._fetcher)
     # Read public data-auto fields used by Grex's Yandex product parser.
     _targets = {
         "productCardTitle",
@@ -356,6 +354,9 @@ class _YandexSearchCardsParser(HTMLParser):
 
 class YandexMarketAdapter(PublicHtmlSearchAdapter):
     """Yandex Market public-page connector."""
+
+    async def _fetch_public_page(self, url: str) -> tuple[str, str]:
+        return await ym_requests.fetch_public_page(url, self._valid_marketplace_url, self._fetcher)
 
     marketplace = "Яндекс Маркет"
     base_search_url = "https://market.yandex.ru/search?text={query}"
