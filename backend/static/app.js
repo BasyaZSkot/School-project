@@ -314,9 +314,6 @@ form.addEventListener("submit", event => {
   event.preventDefault();
   runSearch(input.value);
 });
-document.querySelectorAll(".example-query").forEach(item =>
-  item.addEventListener("click", () => runSearch(item.textContent))
-);
 moreButton.addEventListener("click", () => {
   if (moreButton.hidden) return;
   moreButton.disabled = true;
