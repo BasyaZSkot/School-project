@@ -44,6 +44,10 @@ def constraints(offer):
 def model_key(offer):
     # Keep model modifiers (Pro/Max/Plus/SE); seller names are never consulted.
     text = str(offer.model or offer.title).casefold()
+    iphone = re.search(r'\biphone\s*(\d{1,2})\s*(pro\s*max|pro|plus|mini|e)?\b', text)
+    if iphone:
+        modifier = re.sub(r'\s+', '', iphone.group(2) or '')
+        return ('iphone', iphone.group(1), modifier)
     text = re.sub(r'\b\d{1,3}\s*[/+]\s*\d{2,4}\s*(?:гб|gb)\b', ' ', text)
     text = re.sub(r'\b\d+(?:[.,]\d+)?\s*(?:гб|gb|тб|tb)\b', ' ', text)
     text = norm(text)

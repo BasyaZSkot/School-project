@@ -20,6 +20,13 @@ class CrossMarketTests(unittest.IsolatedAsyncioTestCase):
         adapters=[Adapter([a,b])] if a.marketplace==b.marketplace else [Adapter([a]),Adapter([b])]
         return (await MarketplaceSearchService(adapters=adapters).search('test'))['products']
 
+    async def test_iphone_titles_with_sim_and_app_details_group_together(self):
+        a=offer('Яндекс Маркет','Смартфон Apple iPhone 16 128 ГБ Pink розовый, Dual eSIM, без RuStore и MAX',brand='Apple',seller='Созвон')
+        b=offer('Яндекс Маркет','Смартфон Apple iPhone 16, 128ГБ Dual: NanoSim Pink (Розовый)',brand='Apple',seller='iGlobalShop')
+        products=await self.products(a,b)
+        self.assertEqual(len(products),1)
+        self.assertEqual(len(products[0]['offers']),2)
+
     async def test_same_model_with_different_category_words_has_prices_together(self):
         a=offer('Wildberries', 'Кроссовки Air Force 1 форсы кеды', brand='Nike', price=3328)
         b=offer('Яндекс Маркет', 'Nike Air Force 1', brand='Nike', model='Air Force 1', price=4000)
