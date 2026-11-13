@@ -31,3 +31,24 @@ html[data-theme=dark] :is(.notice,.auth-message) { background:var(--soft); color
 html[data-theme=dark] :is(.offer-product-image,.gallery-main,.gallery-thumb) { background:#fff; }
 @media(max-width:800px) { html[data-search-view=compact] .offers-list { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:580px) { .theme-switch { margin:8px 0; } .view-switch { justify-content:space-between; flex-wrap:wrap; } html[data-search-view=compact] .offers-list,html[data-product-view=compact] .product-offer-list { grid-template-columns:1fr; } }
+/* Compact controls keep their full names for assistive technology. */
+.theme-switch { width:44px; padding:6px; font-size:19px; }
+.view-switch { width:fit-content; gap:3px; margin:12px 0 16px auto; padding:4px; border:1px solid var(--line); border-radius:10px; background:var(--paper); }
+.view-option { display:grid; place-items:center; width:40px; height:38px; border:0; border-radius:7px; background:transparent; color:var(--muted); font-size:21px; line-height:1; cursor:pointer; }
+.view-option:hover { background:var(--soft); color:var(--ink); }
+.view-option[aria-pressed=true] { background:var(--soft); color:var(--accent); }
+.view-option:focus-visible,.theme-switch:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.main-nav a[href="/"]::before { content:'🔍'; }
+.main-nav a[href="/delivery"]::before { content:'📍'; }
+.main-nav a[href="/monitoring"]::before { content:'🔔'; }
+.main-nav a[href="/history"]::before { content:'📈'; }
+.main-nav a[href="/favorites"]::before { content:'🤍'; }
+.main-nav a[href="/compare"]::before { content:'⚖️'; }
+.main-nav a[href="/notifications"]::before { content:'💬'; }
+.main-nav a::before { margin-right:6px; font-size:14px; }
+html[data-theme=dark] :is(.top-action,.button-secondary) { color:var(--ink); background:var(--paper); border-color:var(--line); }
+html[data-theme=dark] :is(.top-action,.button-secondary):hover { color:var(--ink); background:var(--soft); border-color:var(--accent); }
+html[data-theme=dark] .button-primary { color:#17171e; background:#aaa3ff; }
+html[data-theme=dark] .button-primary:hover { color:#17171e; background:#cbc6ff; }
+html[data-theme=dark] .notification-card { background:var(--paper); color:var(--ink); }
+@media(max-width:580px) { .view-switch { justify-content:flex-end; margin-left:auto; } }

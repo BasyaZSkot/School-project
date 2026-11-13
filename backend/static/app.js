@@ -165,7 +165,7 @@ function renderOffers(products, query, append) {
       if (index >= 2) row.hidden = true;
       const info = element("div", "offer-info");
       info.append(element("strong", "", offer.marketplace));
-      if(offer.seller)info.append(element("span","","Продавец: "+offer.seller));
+      if(offer.seller)info.append(element("span","",""+offer.seller));
       if (offer.in_stock === false) info.append(element("span", "stock-badge-empty", "Нет в наличии"));
       for (const badge of Catalog.badges(offer, best).filter(value => value === "Лучшее предложение")) {
         const label = element("span", "best-price-badge", badge);
@@ -237,7 +237,7 @@ function renderOffers(products, query, append) {
     productCount += 1;
     renderedCount += 1;
   }
-  offersCaption.textContent = "Предложений: " + offerCount + ". Итоговую цену проверьте в магазине.";
+  offersCaption.textContent = "Предложений: " + offerCount;
   count.textContent = "Показано " + productCount + " из " + filteredProducts.length;
   return renderedCount;
 }
@@ -311,7 +311,7 @@ function applyFilters(displayed = DISPLAY_BATCH_SIZE) {
   }
   const active = [filters.min,filters.max,filters.brand,filters.marketplace,filters.rating,filters.delivery,filters.stock].filter(Boolean).length;
   document.querySelector("#filter-active-count").textContent = active ? "· " + active : "";
-  feedback.textContent = "Подходит " + filteredProducts.length + " из " + bufferedProducts.length + " загруженных товаров. Сроки доставки зависят от адреса.";
+  feedback.textContent = "Найдено: " + filteredProducts.length + " из " + bufferedProducts.length;
   saveSearchState();
 }
 function resetFilters() {
