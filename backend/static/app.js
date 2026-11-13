@@ -325,7 +325,8 @@ async function fetchSearchResults(sequence = searchSequence) {
   const params = new URLSearchParams({
     q: activeQuery,
     limit: String(MAX_BUFFERED_RESULTS),
-    offset: "0"
+    offset: "0",
+    collect_all: "true"
   });
   if (Region.getId() !== null) params.set("region_id",String(Region.getId()));
   const response = await fetch("/api/search?" + params, {
@@ -350,11 +351,7 @@ async function fetchSearchResults(sequence = searchSequence) {
     emptyState.querySelector("span").textContent = "Уточните бренд и модель или откройте поиск на площадке ниже.";
   }
 
-  if ((data.total_products ?? 0) >= MAX_BUFFERED_RESULTS && !data.exact_total) {
-    message(notice, "Показаны первые 200 доступных товаров. Уточните запрос, чтобы найти нужную модель.");
-  } else {
-    message(notice, data.notice);
-  }
+  message(notice, data.notice || "Загружено до 200 товаров с каждой включённой площадки. Совпадающие товары объединены; остальные показаны отдельно.");
   updateMoreButton();
   saveSearchState();
   return data;
@@ -426,7 +423,7 @@ function saveSearchState() {
   if ((savedResponse.region?.id ?? null) !== Region.getId()) return;
   try {
     sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-      version: 5, query: activeQuery, data: savedResponse, region_id:Region.getId(),
+      version: 6, query: activeQuery, data: savedResponse, region_id:Region.getId(),
       displayed: displayedProductCount, scrollY: window.scrollY, filters:readFilters()
     }));
   } catch { /* Browsing also works when storage is unavailable or full. */ }
@@ -434,9 +431,9 @@ function saveSearchState() {
 function restoreSearchState() {
   try {
     const state = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || "null");
-    if (!state || ![1,2,3,4,5].includes(state.version) || typeof state.query !== "string" ||
+    if (!state || ![1,2,3,4,5,6].includes(state.version) || typeof state.query !== "string" ||
         !Array.isArray(state.data?.products) || !Number.isInteger(state.displayed)) return;
-    if (state.version < 5 || (state.region_id ?? null) !== Region.getId()) {
+    if (state.version < 6 || (state.region_id ?? null) !== Region.getId()) {
       runSearch(state.query).then(() => {
         if (savedResponse) {populateFilters(state.filters); applyFilters(state.displayed);}
       });

@@ -439,8 +439,13 @@ async def search(
     offset: int = Query(default=0, ge=0, le=PROVIDER_FETCH_CAP * 3),
     session_id: str | None = Query(default=None, min_length=8, max_length=80),
     region_id: int | None = Query(default=None, ge=1, le=1000000),
+    collect_all: bool = Query(default=False, description="Return grouped first 200 offers from each enabled marketplace"),
 ):
     try:
+        if collect_all:
+            if region_id is not None:
+                get_region(region_id)
+            return await search_service.search(q, limit, offset, session_id=session_id, region_id=region_id, collect_all=True)
         if region_id is not None:
             get_region(region_id)
             return await search_service.search(q, limit, offset, session_id=session_id, region_id=region_id)

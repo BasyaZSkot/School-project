@@ -4,6 +4,7 @@ import asyncio
 import os
 import time
 from collections import defaultdict
+from dataclasses import replace
 
 import httpx
 
@@ -126,15 +127,19 @@ class MarketplaceSearchService:
         return await asyncio.wait_for(parser(product_url), timeout=self.provider_timeout)
 
     async def _search_one(self, adapter: SearchAdapter, query: str, limit: int):
-        return await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
+        result = await asyncio.wait_for(adapter.search(query, limit), timeout=self.provider_timeout)
+        if len(result.offers) > limit:
+            result = replace(result, offers=result.offers[:limit], has_more=True)
+        return result
 
     async def search(
         self, query: str, limit: int = 20, offset: int = 0,
         session_id: str | None = None, region_id: int | None = None,
+        collect_all: bool = False,
     ) -> dict:
         with region_scope(region_id) as region:
             cache_id = f"{session_id}:region:{region_id}" if session_id and region else session_id
-            result = await self._search(query, limit, offset, session_id=cache_id)
+            result = await self._search(query, limit, offset, session_id=cache_id, collect_all=collect_all)
             result["region"] = region
             unconfirmed = False
             for product in result["products"]:
@@ -152,8 +157,11 @@ class MarketplaceSearchService:
     async def _search(
         self, query: str, limit: int = 20, offset: int = 0,
         session_id: str | None = None,
+        collect_all: bool = False,
     ) -> dict:
         query = query.strip()
+        if collect_all and offset:
+            raise ValueError('collect_all requires offset=0')
         if not query:
             raise ValueError("Search query must not be empty")
         if not 1 <= limit <= PROVIDER_FETCH_CAP:
@@ -174,7 +182,7 @@ class MarketplaceSearchService:
                 del self._search_sessions[key]
         if session_id:
             saved = self._search_sessions.get(session_id)
-            if saved and saved["query"] == query:
+            if saved and saved["query"] == query and not collect_all:
                 offers_by_marketplace = {
                     name: list(items) for name, items in saved["offers"].items()
                 }
@@ -183,7 +191,7 @@ class MarketplaceSearchService:
 
         # Fetch enough records from each provider to assemble the requested
         # global page after cross-marketplace grouping and deduplication.
-        provider_limit = min(PROVIDER_FETCH_CAP, offset + limit + 1)
+        provider_limit = PROVIDER_FETCH_CAP if collect_all else min(PROVIDER_FETCH_CAP, offset + limit + 1)
         results = await asyncio.gather(
             *(self._search_one(adapter, query, provider_limit) for adapter in self.search_adapters),
             return_exceptions=True,
@@ -368,7 +376,7 @@ class MarketplaceSearchService:
         else:
             products.sort(key=lambda item: normalize_title(item["title"]))
         total_products = len(products)
-        page_products = products[offset:offset + limit]
+        page_products = products if collect_all else products[offset:offset + limit]
         # Grouping merges offers, so the product count alone can drop below a
         # full page even though providers still have more cards to give.
         # provider_limit == PROVIDER_FETCH_CAP is the most we ever request, so
@@ -390,12 +398,17 @@ class MarketplaceSearchService:
         # product?" -- so on a typical page, total_products is NOT the real
         # total and must not be read as one.
         exact_total = not provider_may_have_more
+        if collect_all:
+            has_more = False
+            retryable = False
         return {
             "query": query,
             "providers": provider_results,
             "products": page_products,
             "offset": offset,
-            "limit": limit,
+            "limit": len(page_products) if collect_all else limit,
+            "per_marketplace_limit": provider_limit,
+            "result_scope": "first_200_per_marketplace" if collect_all else "page",
             "total_products": total_products,
             "exact_total": exact_total,
             "has_more": has_more,
