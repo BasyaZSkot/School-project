@@ -156,18 +156,13 @@ class MergedProductsKeepPaginationTests(unittest.TestCase):
 
 
 class SameMarketplaceListingsPaginationTests(unittest.TestCase):
-    def test_second_and_third_load_more_return_new_same_title_products(self):
+    def test_same_title_sellers_are_collected_in_one_card_without_losing_offers(self):
         service = MarketplaceSearchService(adapters=[SameTitleAdapter()])
-        pages = [
-            asyncio.run(service.search("item", limit=20, offset=offset))
-            for offset in (0, 20, 40, 60)
-        ]
-        ids = [[product["offers"][0]["external_id"] for product in page["products"]]
-               for page in pages]
-        self.assertEqual([len(page["products"]) for page in pages], [20, 20, 20, 20])
-        self.assertTrue(all(page["has_more"] for page in pages[:3]))
-        self.assertFalse(pages[3]["has_more"])
-        self.assertEqual(len(set(sum(ids, []))), 80)
+        result = asyncio.run(service.search("item", collect_all=True))
+        self.assertEqual(len(result["products"]), 1)
+        self.assertEqual(len(result["products"][0]["offers"]), 80)
+        self.assertEqual(len({o["external_id"] for o in result["products"][0]["offers"]}),80)
+        self.assertFalse(result["has_more"])
 
 
 class SearchSessionKeepsResultsOnProviderFailureTests(unittest.TestCase):

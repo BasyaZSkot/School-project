@@ -61,7 +61,9 @@ def extract(title, specifications=None, explicit=None, brand=None, model=None, c
     if result.get("color"):
         result["color"] = COLORS.get(norm(result["color"]), norm(result["color"]))
     state = norm(condition) or result.get("condition") or text
-    if re.search(r"\b(восстановленный|восстановлен|refurbished|refurb)\b", state): result["condition"] = "восстановленный"
+    if re.search(r"\b(витринный|витринная|демонстрационный|display|demo)\b", state): result["condition"] = "витринный образец"
+    elif re.search(r"\b(уцененный|уценка)\b", state): result["condition"] = "уценённый"
+    elif re.search(r"\b(восстановленный|восстановлен|refurbished|refurb)\b", state): result["condition"] = "восстановленный"
     elif re.search(r"\b(б у|бу|used|бывший в употреблении)\b", state): result["condition"] = "б/у"
     elif re.search(r"\b(новый|новое|new)\b", state): result["condition"] = "новый"
     elif condition: result["condition"] = norm(condition)[:160]

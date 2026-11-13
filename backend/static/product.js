@@ -46,7 +46,7 @@ function readProduct() {
     try { product = JSON.parse(raw); } catch { return null; }
   }
   if (typeof product?.title !== "string" || !Array.isArray(product.offers)) return null;
-  const offers = product.offers.filter(o => o && validProductUrl(o.marketplace,o.url) && Catalog.validPrice(o)).slice(0,12)
+  const offers = product.offers.filter(o => o && validProductUrl(o.marketplace,o.url) && Catalog.validPrice(o)).slice(0,600)
     .map(o => ({...o, specifications:Array.isArray(o.specifications) ? o.specifications : [],
       reviews:Array.isArray(o.reviews) ? o.reviews : [], delivery:o.delivery && typeof o.delivery === "object" ? o.delivery : {}}));
   return offers.length ? {title:product.title.slice(0,300), offers} : null;
@@ -55,8 +55,8 @@ function showImage(index) {
   if (!galleryImages.length) return;
   imageIndex = (index + galleryImages.length) % galleryImages.length;
   for (const image of [$("#product-image"), $("#gallery-dialog-image")]) {
-    image.src = galleryImages[imageIndex]; image.referrerPolicy = "no-referrer";
     image.alt = $("#product-title").textContent + " — фото " + (imageIndex + 1);
+    window.MultiMarketMedia.set(image,sources[selectedSource],{urls:[galleryImages[imageIndex]]});
   }
   const count = (imageIndex + 1) + " из " + galleryImages.length;
   $("#gallery-count").textContent = count;
@@ -75,7 +75,7 @@ function showGallery(offer) {
   galleryImages.forEach((url,index) => {
     const button = element("button", "gallery-thumb"); button.type = "button";
     button.setAttribute("aria-label", "Фото " + (index + 1));
-    const image = element("img"); image.src = url; image.alt = ""; image.loading = "lazy"; image.referrerPolicy = "no-referrer";
+    const image = element("img"); image.alt = "Фото " + (index + 1);window.MultiMarketMedia.set(image,offer,{urls:[url],lazy:true});
     button.append(image); button.addEventListener("click", () => showImage(index));
     $("#gallery-thumbs").append(button);
   });
@@ -159,6 +159,7 @@ function showSource(index) {
   selectedSource = index; reviewLimit = 5; specsExpanded = false;
   $("#spec-search").value = ""; $("#review-rating").value = "";
   const offer = sources[index]; if (!offer) return;
+  $("#product-source").value=String(index);
   activeVariant=variantKey(offer);$("#product-variant").value=activeVariant;
   $("#product-title").textContent=offer.title;renderOffers();
   $("#product-description").textContent = offer.description || "Магазин не передал описание товара.";
@@ -166,9 +167,11 @@ function showSource(index) {
   $("#product-rating").textContent = rating > 0 && rating <= 5 ? rating.toLocaleString("ru-RU") + " из 5" : "Оценка не указана";
   $("#product-review-count").textContent = offer.review_count != null ? "Оценок и отзывов: " + Number(offer.review_count).toLocaleString("ru-RU") : "Количество оценок не указано";
   showGallery(offer); showSpecs(); showReviews();
+  refreshSource(index);
 }
 function renderOffers() {
-  const visible=sources.filter(o=>variantKey(o)===activeVariant);
+  const chosen=sources[selectedSource]?.variants||{};
+  const visible=sources.filter(o=>Object.keys(chosen).every(key=>!o.variants?.[key]||o.variants[key]===chosen[key]));
   const best = Catalog.bestOffers(visible);
   $("#product-offers").replaceChildren();
   for (const offer of visible) {
@@ -221,36 +224,32 @@ async function loadProduct() {
   const richness = o => Catalog.images(o).length + (o.specifications?.length || 0) + (o.reviews?.length || 0) + (o.description ? 1 : 0);
   selectedSource = sources.reduce((best,o,i) => richness(o) > richness(sources[best]) ? i : best,0);
   updateVariants(); renderOffers(); updateSourceSelect(); showSource(selectedSource);
-  $("#product-status").textContent = "Обновляем фотографии, характеристики, отзывы и доставку…";
-  let userSelected = false;
-  $("#product-source").addEventListener("change", event => {userSelected = true; showSource(Number(event.target.value));});
-  const results = await Promise.all(sources.map(async offer => {
-    try {
-      const params = new URLSearchParams({marketplace:offer.marketplace,product_url:offer.url});
-      if (Region.getId() !== null) params.set("region_id",String(Region.getId()));
-      const response = await fetch("/api/product-details?" + params,{headers:{Accept:"application/json"}});
-      const data = await response.json();
-      if (!response.ok || !data.details_available) return null;
-      return data;
-    } catch { return null; }
-  }));
-  sources = sources.map((offer,i) => {
-    const detail = results[i]; if (!detail) return offer;
-    const next = {...offer};
-    for (const key of ["description","rating","review_count","in_stock","brand","model","seller","condition"]) if (detail[key] != null && detail[key] !== "") next[key] = detail[key];
-    next.variants=Object.keys(detail.variants||{}).length?detail.variants:offer.variants;
-    next.image_urls = [...new Set([...Catalog.images(detail),...Catalog.images(offer)])].slice(0,20); next.image_url = next.image_urls[0];
-    next.specifications = detail.specifications?.length ? detail.specifications : offer.specifications;
-    next.reviews = reviewItems({reviews:[...(detail.reviews || []),...(offer.reviews || [])]});
-    next.delivery = Object.keys(detail.delivery || {}).length ? detail.delivery : offer.delivery;
-    return next;
-  });
-  if (!userSelected) selectedSource = sources.reduce((best,o,i) => richness(o) > richness(sources[best]) ? i : best,0);
-  Region.observeOffers(sources);
-  updateVariants(); renderOffers(); updateSourceSelect(); showSource(selectedSource);
-  $("#product-status").textContent = sources.some(o => o.delivery?.region_confirmed === false)
-    ? "Магазин не подтвердил выбранный город. Срок доставки уточните в магазине."
-    : results.some(Boolean) ? "Сведения обновлены из доступных карточек магазинов." : "Показаны доступные сведения из поиска. Остальные подробности можно уточнить в магазине.";
+  $("#product-source").addEventListener("change", event => showSource(Number(event.target.value)));
+}
+const detailRequests=new Map();
+async function refreshSource(index){
+  if(detailRequests.has(index))return detailRequests.get(index);
+  const offer=sources[index];if(!offer)return;
+  const pending=(async()=>{
+    if(selectedSource===index)$("#product-status").textContent="Обновляем фотографии, характеристики и отзывы выбранного предложения…";
+    let available=false;
+    try{
+      const params=new URLSearchParams({marketplace:offer.marketplace,product_url:offer.url});
+      if(Region.getId()!==null)params.set("region_id",String(Region.getId()));
+      const response=await fetch("/api/product-details?"+params,{headers:{Accept:"application/json"}}),data=await response.json();
+      if(response.ok&&data.details_available){
+        const next=window.MultiMarketLibraryData.mergeDetails(offer,data);
+        next.reviews=reviewItems({reviews:[...(data.reviews||[]),...(offer.reviews||[])]});
+        next.delivery=Object.keys(data.delivery||{}).length?data.delivery:offer.delivery;
+        sources[index]=next;available=true;Region.observeOffers([next]);
+      }
+    }catch{}
+    if(selectedSource!==index)return;
+    if(available){activeVariant=variantKey(sources[index]);updateVariants();updateSourceSelect();showSource(index);}
+    $("#product-status").textContent=available?"Сведения обновлены из доступной карточки магазина.":"Показаны доступные сведения из поиска. Остальные подробности можно уточнить в магазине.";
+  })();
+  detailRequests.set(index,pending);return pending;
+
 }
 $("#spec-search").addEventListener("input",showSpecs);
 $("#product-variant").addEventListener("change",()=>{activeVariant=$("#product-variant").value;selectedSource=sources.findIndex(o=>variantKey(o)===activeVariant);updateSourceSelect();showSource(selectedSource);});

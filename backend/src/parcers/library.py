@@ -54,7 +54,7 @@ def snapshot(data):
     if not isinstance(data, dict) or not isinstance(data.get("title"), str) or not data["title"].strip():
         raise ValueError("Укажите товар для сохранения")
     offers = []
-    for raw in (data.get("offers") or [])[:12]:
+    for raw in (data.get("offers") or [])[:600]:
         if not isinstance(raw, dict) or not valid_url(raw.get("marketplace"),raw.get("url")): continue
         price = raw.get("price")
         if isinstance(price,bool) or not isinstance(price,(int,float)) or not math.isfinite(price) or price <= 0: continue
@@ -64,6 +64,8 @@ def snapshot(data):
         for key in ("brand","model","seller","condition","external_id"):
             if isinstance(raw.get(key),str): offer[key]=raw[key][:200]
         if isinstance(raw.get("in_stock"),bool): offer["in_stock"]=raw["in_stock"]
+        if type(raw.get("rating")) in (int,float) and math.isfinite(raw["rating"]) and 0 < raw["rating"] <= 5: offer["rating"]=raw["rating"]
+        if type(raw.get("review_count")) is int and 0 <= raw["review_count"] <= 2**53-1: offer["review_count"]=raw["review_count"]
         images = [raw.get("image_url"),*(raw.get("image_urls") if isinstance(raw.get("image_urls"),list) else [])]
         offer["image_urls"] = []
         for value in images:

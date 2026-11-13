@@ -1,0 +1,8 @@
+const test=require('node:test'),assert=require('node:assert/strict'),M=require('../../backend/static/media.js');
+const offer={marketplace:'Wildberries',external_id:'1241343962',image_url:'https://basket-41.wbbasket.ru/vol12413/part1241343/1241343962/images/big/1.webp'};
+test('saved WB image addresses are routed through the current registry',()=>{assert.deepEqual(M.candidates(offer),['/api/media/wb/1241343962/1',offer.image_url]);});
+test('unsafe addresses and unrelated images are never rerouted',()=>{assert.deepEqual(M.candidates({...offer,image_url:'javascript:alert(1)'}),[]);assert.deepEqual(M.candidates({...offer,external_id:'99'}),[offer.image_url]);assert.deepEqual(M.candidates({...offer,image_url:offer.image_url.replace('wbbasket.ru','wbbasket.ru.evil.test')}),[offer.image_url.replace('wbbasket.ru','wbbasket.ru.evil.test')]);});
+test('image errors try alternatives once then replace the broken icon',()=>{const img={dataset:{}};M.set(img,offer);assert.equal(img.src,'/api/media/wb/1241343962/1');img.onerror();assert.equal(img.src,offer.image_url);img.onerror();assert.equal(img.src,M.placeholder);assert.equal(img.onerror,null);assert.equal(img.alt,'Фото недоступно');});
+test('absent photos have a readable placeholder',()=>{const img={dataset:{}};M.set(img,{});assert.equal(img.src,M.placeholder);});
+const D=require('../../backend/static/library-data.js');
+test('old and corrected WB image hosts refer to one gallery photo',()=>{const old='https://basket-41.wbbasket.ru/vol12413/part1241343/1241343962/images/big/1.webp',fresh=old.replace('basket-41','basket-44');const result=D.mergeDetails({marketplace:'Wildberries',image_url:old,image_urls:[old]}, {metadata_only:true,image_urls:[fresh]});assert.deepEqual(result.image_urls,[fresh]);});

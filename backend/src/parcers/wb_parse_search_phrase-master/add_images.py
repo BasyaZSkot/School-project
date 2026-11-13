@@ -15,7 +15,11 @@ def add_images(item_models: list[Item]):
 
         short_id = product.id // 100000
         part = product.id // 1000
-        basket = calc_numb_basket(short_id=short_id)
+        try:
+            basket = calc_numb_basket(short_id=short_id)
+        except ValueError:
+            product.image_links = ""
+            continue
 
         base_url = (
             f"https://basket-{basket}.wbbasket.ru/"
@@ -24,7 +28,7 @@ def add_images(item_models: list[Item]):
 
         image_count = min(product.pics, MAX_IMAGES)
 
-        product.image_links = "\u200B" + ";".join(
+        product.image_links = ";".join(
             base_url + f"{i}.webp"
             for i in range(1, image_count + 1)
         )

@@ -23,7 +23,9 @@
     const tokens=new Set(rest.split(/\s+/)),matches=new Set(Object.entries(colors).filter(([word])=>tokens.has(word)).map(([,color])=>color));if(matches.size===1&&!result.color)result.color=[...matches][0];
     if(result.color)result.color=colors[canonical(result.color)]||canonical(result.color);
     const state=" "+(canonical(o.condition)||result.condition||canonical(o.title))+" ";
-    if(["восстановленный","восстановлен","refurbished","refurb"].some(word=>state.includes(" "+word+" ")))result.condition="восстановленный";
+    if(["витринный","витринная","демонстрационный","display","demo"].some(word=>state.includes(" "+word+" ")))result.condition="витринный образец";
+    else if(["уцененный","уценка"].some(word=>state.includes(" "+word+" ")))result.condition="уценённый";
+    else if(["восстановленный","восстановлен","refurbished","refurb"].some(word=>state.includes(" "+word+" ")))result.condition="восстановленный";
     else if(["б у","бу","used","бывший в употреблении"].some(word=>state.includes(" "+word+" ")))result.condition="б/у";
     else if(["новый","новое","new"].some(word=>state.includes(" "+word+" ")))result.condition="новый";
     else if(o.condition)result.condition=canonical(o.condition);
@@ -35,9 +37,9 @@
   function sameProduct(left,right){return left.offers.some(a=>right.offers.some(b=>{if(locator(a)!==locator(b)||(a.external_id&&b.external_id&&a.external_id!==b.external_id))return false;const av=a.variants||variants(a),bv=b.variants||variants(b);return Object.keys(av).every(k=>!(k in bv)||av[k]===bv[k]);}));}
   function snapshot(product){
     if(!product||typeof product.title!=="string"||!Array.isArray(product.offers))return null;
-    const offers=product.offers.filter(o=>o&&validUrl(o.marketplace,o.url)&&typeof o.price==="number"&&Number.isFinite(o.price)&&o.price>0&&/^[A-Z]{3}$/.test(o.currency||"RUB")).slice(0,12).map(o=>{
+    const offers=product.offers.filter(o=>o&&validUrl(o.marketplace,o.url)&&typeof o.price==="number"&&Number.isFinite(o.price)&&o.price>0&&/^[A-Z]{3}$/.test(o.currency||"RUB")).slice(0,600).map(o=>{
       const images=[o.image_url,...(Array.isArray(o.image_urls)?o.image_urls:[])].filter(v=>{try{const u=new URL(v);return u.protocol==="https:"&&!u.username&&!u.password;}catch{return false;}}).slice(0,20);
-      return {marketplace:o.marketplace,url:o.url,title:String(o.title||product.title).slice(0,300),price:o.price,currency:o.currency||"RUB",external_id:String(o.external_id||"").slice(0,200),brand:String(o.brand||"").slice(0,200),model:String(o.model||"").slice(0,200),seller:String(o.seller||"").slice(0,200),condition:String(o.condition||"").slice(0,160),in_stock:typeof o.in_stock==="boolean"?o.in_stock:null,image_url:images[0],image_urls:images,variants:variants({...o,title:o.title||product.title}),specifications:(Array.isArray(o.specifications)?o.specifications:[]).filter(s=>s&&s.name&&s.value).slice(0,100).map(s=>({name:String(s.name).slice(0,160),value:String(s.value).slice(0,500)}))};
+      return {marketplace:o.marketplace,url:o.url,title:String(o.title||product.title).slice(0,300),price:o.price,currency:o.currency||"RUB",external_id:String(o.external_id||"").slice(0,200),brand:String(o.brand||"").slice(0,200),model:String(o.model||"").slice(0,200),seller:String(o.seller||"").slice(0,200),condition:String(o.condition||"").slice(0,160),rating:typeof o.rating==="number"&&Number.isFinite(o.rating)&&o.rating>0&&o.rating<=5?o.rating:null,review_count:Number.isSafeInteger(o.review_count)&&o.review_count>=0?o.review_count:null,in_stock:typeof o.in_stock==="boolean"?o.in_stock:null,image_url:images[0],image_urls:images,variants:variants({...o,title:o.title||product.title}),specifications:(Array.isArray(o.specifications)?o.specifications:[]).filter(s=>s&&s.name&&s.value).slice(0,100).map(s=>({name:String(s.name).slice(0,160),value:String(s.value).slice(0,500)}))};
     });
     if(!offers.length)return null;const value={title:product.title.slice(0,300),offers};value.identity=identity(value);return value;
   }
@@ -45,12 +47,24 @@
   function toggle(storage,product){const item=snapshot(product);if(!item)throw Error("Нет данных для сравнения");const list=read(storage),index=list.findIndex(p=>sameProduct(p,item));if(index>=0)list.splice(index,1);else{if(list.length>=4)throw Error("Можно сравнить до четырёх товаров. Удалите один на странице сравнения.");list.push(item);}storage.setItem(KEY,JSON.stringify(list));return list;}
   function best(product){const available=product.offers.filter(o=>o.in_stock!==false),list=available.length?available:product.offers,cur=list.some(o=>o.currency==="RUB")?"RUB":list[0]?.currency;return list.filter(o=>o.currency===cur).reduce((a,b)=>!a||b.price<a.price?b:a,null);}
   function rows(offers){
-    const definitions=[["brand","Бренд"],["model","Модель"],["seller","Продавец"],["condition","Состояние"],["storage","Встроенная память"],["ram","Оперативная память"],["color","Цвет"],["package","Комплектация"],["version","Версия"]];
+    const definitions=[["brand","Бренд"],["model","Модель"],["seller","Продавец"],["condition","Состояние"],["storage","Встроенная память"],["ram","Оперативная память"],["color","Цвет"],["package","Комплектация"],["version","Версия"],["processor","Процессор"],["screen","Диагональ экрана"],["resolution","Разрешение экрана"],["battery","Ёмкость аккумулятора"],["sim_count","Количество SIM-карт"],["size","Размер"],["gender","Пол"],["material","Материал"],["weight","Вес"],["power","Мощность"],["manufacturer_code","Артикул производителя"],["rating","Оценка покупателей"],["review_count","Количество оценок и отзывов"]];
     const names=new Map(definitions),maps=offers.map(o=>{
-      const data=new Map();for(const [key] of definitions){const value=o?.variants?.[key]||o?.[key];if(value)data.set(key,String(value));}
-      for(const spec of o?.specifications||[]){const normalized=norm(spec.name),alias={"цвет товара":"color","цвет":"color","встроенная память":"storage","объем встроенной памяти":"storage","оперативная память":"ram","комплектация":"package","состояние":"condition","версия":"version","бренд":"brand","модель":"model"}[normalized],key=alias||"spec:"+normalized;if(!names.has(key))names.set(key,spec.name);if(!data.has(key))data.set(key,spec.value);}return data;
+      const data=new Map();const derived=variants(o||{});for(const [key] of definitions){const value=derived[key]??o?.[key];if(value!==undefined&&value!==null&&value!=="")data.set(key,String(value));}
+      for(const spec of o?.specifications||[]){const normalized=canonical(spec.name),alias={"цвет товара":"color","цвет":"color","встроенная память":"storage","объем встроенной памяти":"storage","оперативная память":"ram","комплектация":"package","состояние":"condition","версия":"version","бренд":"brand","модель":"model","модель процессора":"processor","процессор":"processor","диагональ":"screen","диагональ экрана":"screen","разрешение экрана":"resolution","емкость аккумулятора":"battery","емкость батареи":"battery","количество sim карт":"sim_count","число sim карт":"sim_count","размер":"size","размер обуви":"size","размер одежды":"size","пол":"gender","материал":"material","масса":"weight","вес":"weight","мощность":"power","артикул производителя":"manufacturer_code","код производителя":"manufacturer_code"}[normalized],key=alias||"spec:"+normalized;if(!names.has(key))names.set(key,spec.name);if(!data.has(key))data.set(key,spec.value);}return data;
     });
     return [...names].filter(([key])=>maps.some(m=>m.has(key))).map(([key,name])=>{const values=maps.map(m=>m.get(key)||"Нет данных");return {key,name,values,different:new Set(values.map(norm)).size>1};});
   }
-  return {KEY,norm,validUrl,identity,snapshot,read,toggle,best,rows,variants,locator,sameProduct};
+  function mergeDetails(offer,data){
+    const result={...offer};
+    for(const key of ["description","rating","review_count","in_stock","brand","model","seller","condition"])if(data[key]!=null&&data[key]!=="")result[key]=data[key];
+    if(!data.metadata_only&&typeof data.price==="number"&&data.price>0&&data.currency===offer.currency)result.price=data.price;
+    const specs=new Map((offer.specifications||[]).map(s=>[canonical(s.name),s]));for(const s of data.specifications||[])if(s?.name&&s?.value)specs.set(canonical(s.name),s);result.specifications=[...specs.values()];
+    const photos=new Map();for(const value of [data.image_url,...(data.image_urls||[]),offer.image_url,...(offer.image_urls||[])].filter(Boolean)){
+      let key=value;try{const u=new URL(value);if(offer.marketplace==='Wildberries'&&/^basket-\d{2,3}\.wbbasket\.ru$/.test(u.hostname)){const m=u.pathname.match(/\/(\d+)\/images\/[^/]+\/(\d+)\.(?:webp|jpg)$/);if(m)key='wb:'+m[1]+':'+m[2];}}catch{continue;}if(!photos.has(key))photos.set(key,value);
+    }
+    result.image_urls=[...photos.values()].slice(0,20);result.image_url=result.image_urls[0];
+    result.variants=variants({...result,variants:{...offer.variants,...data.variants}});
+    return result;
+  }
+  return {KEY,norm,validUrl,identity,snapshot,read,toggle,best,rows,variants,locator,sameProduct,mergeDetails};
 });

@@ -52,26 +52,26 @@
       const list=await loadFavorites(force);wrap.replaceChildren();
       if(!list.length){wrap.append(el("p","Сохраняйте понравившиеся товары кнопкой «В избранное» в поиске или карточке.","empty-panel"));return;}
       for(const item of list){const card=el("article",undefined,"favorite-card"),offer=D.best(item),a=el("a",item.title,"favorite-title");a.href=href(item);
-        if(offer.image_url){const img=el("img");img.src=offer.image_url;img.alt="";img.loading="lazy";img.referrerPolicy="no-referrer";card.append(img);}
+        const img=el("img");img.alt=item.title;window.MultiMarketMedia.set(img,offer,{lazy:true});card.append(img);
         card.append(a,el("p",money(offer)+" · "+offer.marketplace),el("p","Сохранённая цена. Обновлённые условия — в карточке и магазине.","muted"),controls(item));wrap.append(card);
       }update();
     }catch(e){wrap.replaceChildren(el("p",e.message,"notice"));}
   }
   async function enrich(product,offer){
     const key=offer.marketplace+":"+offer.url;if(details.has(key))return details.get(key);
-    const promise=(async()=>{try{await window.MultiMarketRegion?.ready;const params=new URLSearchParams({marketplace:offer.marketplace,product_url:offer.url});const region=window.MultiMarketRegion?.getId();if(region)params.set("region_id",region);const r=await fetch("/api/product-details?"+params);const data=await r.json();if(!r.ok||!data.details_available)return offer;return D.snapshot({title:product.title,offers:[{...offer,...data}]})?.offers[0]||offer;}catch{return offer;}})();details.set(key,promise);return promise;
+    const promise=(async()=>{try{await window.MultiMarketRegion?.ready;const params=new URLSearchParams({marketplace:offer.marketplace,product_url:offer.url});const region=window.MultiMarketRegion?.getId();if(region)params.set("region_id",region);const r=await fetch("/api/product-details?"+params);const data=await r.json();if(!r.ok||!data.details_available)return offer;return D.snapshot({title:product.title,offers:[D.mergeDetails(offer,data)]})?.offers[0]||offer;}catch{return offer;}})();details.set(key,promise);return promise;
   }
   async function renderCompare(){
     const wrap=$("#comparison-table");if(!wrap)return;const run=++compareRun,list=compareList();wrap.replaceChildren();update();
     $("#compare-differences").disabled=list.length<2;
     if(!list.length){wrap.append(el("p","Добавьте от двух до четырёх товаров кнопкой «Сравнить» в поиске, карточке или избранном.","empty-panel"));return;}
-    const offers=list.map(p=>p.offers.find(o=>o.url===selected.get(p.identity))||D.best(p));
+    const offers=list.map(p=>p.offers[selected.get(p.identity)]||D.best(p));
     function draw(current){
       if(run!==compareRun)return;const table=el("table",undefined,"comparison-table"),caption=el("caption","Сравнение товаров и характеристик");table.style.setProperty("--compare-count",String(list.length));caption.className="sr-only";table.append(caption);
       const thead=el("thead"),head=el("tr");head.append(el("th","Характеристика"));
       list.forEach((p,i)=>{const th=el("th");th.scope="col";const a=el("a",p.title);a.href=href(p);th.append(a);
-        if(current[i].image_url){const img=el("img");img.src=current[i].image_url;img.alt="";img.referrerPolicy="no-referrer";th.append(img);}
-        const select=el("select");select.setAttribute("aria-label","Предложение для "+p.title);p.offers.forEach((o,index)=>select.append(new Option(o.marketplace+(o.seller?" · "+o.seller:""),String(index))));select.value=String(p.offers.indexOf(offers[i]));select.addEventListener("change",()=>{selected.set(p.identity,p.offers[Number(select.value)].url);renderCompare();});th.append(select);
+        const img=el("img");img.alt=p.title;window.MultiMarketMedia.set(img,current[i]);th.append(img);
+        const select=el("select");select.setAttribute("aria-label","Предложение для "+p.title);p.offers.forEach((o,index)=>select.append(new Option(o.marketplace+(o.seller?" · "+o.seller:""),String(index))));select.value=String(p.offers.indexOf(offers[i]));select.addEventListener("change",()=>{selected.set(p.identity,Number(select.value));renderCompare();});th.append(select);
         th.append(el("strong",money(current[i])),el("p",current[i].in_stock===false?"Нет в наличии":current[i].in_stock===true?"В наличии":"Наличие уточняйте в магазине","muted"));
         const remove=el("button","Убрать","text-button");remove.type="button";remove.addEventListener("click",()=>{D.toggle(localStorage,p);renderCompare();});th.append(remove);head.append(th);
       });thead.append(head);table.append(thead);const body=el("tbody");

@@ -99,9 +99,9 @@ class MarketplaceSearchService:
     @staticmethod
     def _merge_provider_offers(existing: list[Offer], incoming: list[Offer]) -> list[Offer]:
         merged = list(existing)
-        indexes = {(offer.external_id or offer.url,variant_signature(offer)): index for index, offer in enumerate(merged)}
+        indexes = {(offer.external_id or offer.url, normalize_title(offer.seller or ''), variant_signature(offer)): index for index, offer in enumerate(merged)}
         for offer in incoming:
-            identity = (offer.external_id or offer.url,variant_signature(offer))
+            identity = (offer.external_id or offer.url, normalize_title(offer.seller or ''), variant_signature(offer))
             if identity in indexes:
                 merged[indexes[identity]] = offer
             else:
@@ -199,7 +199,7 @@ class MarketplaceSearchService:
         provider_results = []
         provider_may_have_more = False
         offers: list[Offer] = []
-        seen: set[tuple[str, str]] = set()
+        seen: set[tuple] = set()
         for adapter, result in zip(self.search_adapters, results):
             if isinstance(result, Exception):
                 error_name = "timeout" if isinstance(result, asyncio.TimeoutError) else type(result).__name__
@@ -268,7 +268,7 @@ class MarketplaceSearchService:
                 elif len(result.offers) >= provider_limit:
                     provider_may_have_more = True
                 for offer in result.offers:
-                    identity = (offer.marketplace, offer.external_id or offer.url,variant_signature(offer))
+                    identity = (offer.marketplace, offer.external_id or offer.url, normalize_title(offer.seller or ''), variant_signature(offer))
                     if identity not in seen:
                         seen.add(identity)
                         offers.append(offer)
@@ -295,10 +295,8 @@ class MarketplaceSearchService:
                 if oldest != session_id:
                     del self._search_sessions[oldest]
 
-        # Match the same listing across different marketplaces, but never
-        # collapse two distinct listings from one marketplace into one card.
-        # If several same-market listings share a GTIN/title, pair them in
-        # stable order with listings from other marketplaces where possible.
+        # All sellers of the same product belong together. Check every member
+        # so incomplete data cannot bridge two conflicting variants.
         grouped: dict[str, list[list[Offer]]] = defaultdict(list)
         model_buckets = defaultdict(list)
         for offer in offers:
@@ -310,7 +308,7 @@ class MarketplaceSearchService:
                 candidates.extend(bucket for bucket in model_buckets[model] if all(bucket is not old for old in candidates))
             product_offers = next(
                 (bucket for bucket in candidates
-                 if all(item.marketplace != offer.marketplace and compatible(item, offer) for item in bucket)),
+                 if all(compatible(item, offer) for item in bucket)),
                 None,
             )
             if product_offers is None:

@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import accounts, monitoring, oauth, account_security, library, mailer, notifications, feature_api
+from . import accounts, monitoring, oauth, account_security, library, mailer, notifications, feature_api, wb_media
 from .service import MarketplaceSearchService, PROVIDER_FETCH_CAP
 from .regions import REGIONS, get_region
 from .pickup import pickup_service, yandex_keys
@@ -456,6 +456,15 @@ async def search(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get("/api/media/wb/{product_id}/{image_index}")
+async def wb_image(product_id: int, image_index: int):
+    try:
+        url = await asyncio.to_thread(wb_media.image_url, product_id, image_index)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Фото недоступно") from exc
+    return RedirectResponse(url, headers={"Cache-Control": "public, max-age=3600"})
+
+
 @app.get("/api/product-details")
 async def product_details(
     marketplace: str = Query(min_length=1, max_length=80),
@@ -500,6 +509,10 @@ async def product_details(
             detail="Не удалось получить подробности с публичной страницы товара",
         ) from exc
     if offer is None:
+        if marketplace == "Wildberries":
+            attributes = await wb_media.product_attributes(product_url)
+            if attributes:
+                return {"marketplace": marketplace, "url": product_url, **attributes}
         return {
             "details_available": False,
             "marketplace": marketplace,

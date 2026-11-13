@@ -20,7 +20,7 @@ class ResetRequest(TokenRequest):
 
 class ProductSnapshot(BaseModel):
     title: str = Field(min_length=1,max_length=300)
-    offers: list[dict] = Field(min_length=1,max_length=12)
+    offers: list[dict] = Field(min_length=1,max_length=600)
 
 
 class DeliveryRequest(BaseModel):

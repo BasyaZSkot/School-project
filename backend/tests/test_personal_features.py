@@ -36,6 +36,14 @@ class PersonalTests(unittest.TestCase):
         data=json.loads(json.dumps(PRODUCT));data["offers"][0]["price"]=90
         two=library.save_favorite(self.ua["id"],data)
         self.assertEqual(one["id"],two["id"]);self.assertEqual(len(library.favorites(self.ua["id"])),1)
+    def test_favorites_keep_two_hundred_seller_offers_and_ratings(self):
+        product={"title":"Phone 128 ГБ","offers":[{**PRODUCT['offers'][0],"url":f"https://ozon.ru/product/{i}","seller":f"Seller {i}","rating":4.8,"review_count":0} for i in range(200)]}
+        response=self.a.put("/api/favorites",json=product,headers=self.csrf(self.a))
+        self.assertEqual(response.status_code,200)
+        saved=self.a.get("/api/favorites").json()['favorites'][0]['offers']
+        self.assertEqual(len(saved),200)
+        self.assertEqual(saved[0]['rating'],4.8)
+        self.assertEqual(saved[0]['review_count'],0)
     def test_favorites_do_not_overwrite_different_options_at_the_same_url(self):
         one=library.save_favorite(self.ua["id"],PRODUCT)
         data=json.loads(json.dumps(PRODUCT));data["offers"][0]["title"]="Phone 256 ГБ"
