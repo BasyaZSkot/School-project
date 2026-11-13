@@ -1,5 +1,8 @@
 .theme-switch { margin-left:auto; flex-shrink:0; min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; color:var(--ink); background:var(--paper); font:inherit; font-size:13px; cursor:pointer; }
-.topbar { flex-wrap:wrap; gap:0 20px; padding-top:12px; }
+.topbar { position:sticky; top:0; z-index:20; flex-wrap:wrap; gap:0 20px; padding-top:12px; }
+html { scroll-padding-top:150px; }
+.product-detail-section, #product-details, .pickup-editor, .account-notifications { scroll-margin-top:150px; }
+.skip-link { z-index:21; }
 .main-nav { order:3; width:100%; margin:8px 0 0; justify-content:flex-start; gap:24px; overflow-x:auto; }
 .main-nav a { min-height:48px; flex-shrink:0; }
 .main-nav a[aria-current=page] { border-bottom-color:var(--accent); color:var(--accent); }
