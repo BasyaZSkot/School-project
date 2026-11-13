@@ -159,30 +159,21 @@ function renderOffers(products, query, append) {
     card.append(window.MultiMarketLibrary.controls({title:product.title,offers:product.sourceOffers || offers}));
     const rows = element("div", "offer-rows");
     const best = Catalog.bestOffers(offers);
-    offers.forEach(offer => {
+    offers.forEach((offer, index) => {
       offerCount += 1;
       const row = element("div", "offer-row");
+      if (index >= 2) row.hidden = true;
       const info = element("div", "offer-info");
       info.append(element("strong", "", offer.marketplace));
       if(offer.seller)info.append(element("span","","Продавец: "+offer.seller));
-      if(Object.keys(offer.variants||{}).length)info.append(element("span","variant-summary",Object.values(offer.variants).join(" · ")));
       if (offer.in_stock === false) info.append(element("span", "stock-badge-empty", "Нет в наличии"));
-      // Offers of the same product usually repeat the product's own title;
-      // showing it again under every row just clutters the card, so only
-      // add it when it actually differs (e.g. a seller-specific variant).
-      const offerTitle = (offer.title || "").trim();
-      const productTitle = (product.title || "").trim();
-      if (offerTitle && offerTitle !== productTitle) {
-        info.append(element("span", "", offerTitle));
-      }
-      for (const badge of Catalog.badges(offer, best)) {
+      for (const badge of Catalog.badges(offer, best).filter(value => value === "Лучшее предложение")) {
         const label = element("span", "best-price-badge", badge);
         label.title = badge === "Лучшее предложение"
           ? "Минимальная цена товара среди доступных предложений в этой валюте. Приоритет у товаров в наличии. Доставка не включена."
           : badge === "Высокая оценка" ? "Оценка от 4,5 при наличии не менее 10 оценок." : "Опубликованный срок доставки — до 2 дней. Уточните его для своего адреса.";
         info.append(label);
       }
-      if (Number(offer.rating) > 0) info.append(element("span", "offer-rating", "★ " + offer.rating + (offer.review_count != null ? " · оценок: " + offer.review_count : "")));
       const delivery = element("p", "offer-delivery", Catalog.deliveryLabel(offer));
       const right = element("div", "offer-right");
       right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
@@ -230,6 +221,18 @@ function renderOffers(products, query, append) {
       rows.append(row);
     });
     card.append(rows);
+    if (offers.length > 2) {
+      const more = element("button", "text-button offer-show-more", "Все предложения (" + offers.length + ")");
+      more.type = "button";
+      more.setAttribute("aria-expanded", "false");
+      more.addEventListener("click", () => {
+        const expanded = more.getAttribute("aria-expanded") === "true";
+        [...rows.children].forEach((row, index) => { if (index >= 2) row.hidden = expanded; });
+        more.setAttribute("aria-expanded", String(!expanded));
+        more.textContent = expanded ? "Все предложения (" + offers.length + ")" : "Свернуть предложения";
+      });
+      card.append(more);
+    }
     offersList.append(card);
     productCount += 1;
     renderedCount += 1;
