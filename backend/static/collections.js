@@ -5,10 +5,9 @@
   const $=s=>document.querySelector(s);let favorites=[],favoritePromise,compareRun=0;const details=new Map(),selected=new Map();
   const controlProducts=new WeakMap();let updateQueued=false;
   function scheduleUpdate(){if(updateQueued)return;updateQueued=true;queueMicrotask(()=>{updateQueued=false;update();});}
-  const quick=el("nav",undefined,"library-nav");quick.setAttribute("aria-label","Личная коллекция");
+  const quick=$(".main-nav");
   for(const [href,label] of [["/favorites","Избранное"],["/compare","Сравнение"],["/notifications","Уведомления"]]){const a=el("a",label);a.href=href;if(location.pathname===href)a.setAttribute("aria-current","page");if(href==="/compare")a.dataset.compareLink="";quick.append(a);}
-  $(".topbar")?.insertAdjacentElement("afterend",quick);
-  const feedback=el("p",undefined,"library-feedback");feedback.id="library-feedback";feedback.role="status";feedback.hidden=true;quick.insertAdjacentElement("afterend",feedback);
+  const feedback=el("p",undefined,"library-feedback");feedback.id="library-feedback";feedback.role="status";feedback.hidden=true;$(".topbar")?.insertAdjacentElement("afterend",feedback);
   function say(text){feedback.textContent=text;feedback.hidden=!text;}
   function compareList(){try{return D.read(localStorage);}catch{return [];}}
   async function loadFavorites(force=false){
