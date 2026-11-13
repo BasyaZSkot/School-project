@@ -1,12 +1,14 @@
-"""Return your parsed WB Item objects here; no conversion or JSON is needed."""
+"""Bridge the standalone parser's list[Item] into website search."""
+import asyncio
+from importlib import import_module
+
+
+def _parse_items(query: str) -> list:
+    module = import_module('.wb_parse_search_phrase-master.main', package=__package__)
+    return module.parse(search_phrase=query)
 
 
 async def fetch_items(query: str, limit: int = 200) -> list:
-    """Replace the empty list with your parser's list[Item].
-
-    query is the website search text. Top-level Item prices must be in rubles.
-    For a synchronous parser use: await asyncio.to_thread(parse, query).
-    Do not return print(items), str(items), or the textual Item repr.
-    """
-    items = []  # Return the result of your parser here.
+    """Run the synchronous parser outside the server event loop."""
+    items = await asyncio.to_thread(_parse_items, query)
     return items[:min(limit, 200)]

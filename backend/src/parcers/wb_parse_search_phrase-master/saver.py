@@ -3,7 +3,10 @@ import pyexcel as pe
 from loguru import logger
 from datetime import datetime
 
-from models import Item
+if __package__:
+    from .models import Item
+else:
+    from models import Item
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(BASE_DIR, "results")

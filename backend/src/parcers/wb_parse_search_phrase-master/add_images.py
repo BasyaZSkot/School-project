@@ -1,5 +1,11 @@
-from calc_basket import calc_numb_basket
-from models import Item
+if __package__:
+    from .calc_basket import calc_numb_basket
+else:
+    from calc_basket import calc_numb_basket
+if __package__:
+    from .models import Item
+else:
+    from models import Item
 
 
 MAX_IMAGES = 10

@@ -3,8 +3,14 @@ import requests
 import json
 from loguru import logger
 
-from common_data import HEADERS
-from dto import DataPage
+if __package__:
+    from .common_data import HEADERS
+else:
+    from common_data import HEADERS
+if __package__:
+    from .dto import DataPage
+else:
+    from dto import DataPage
 
 
 class WbSearchPhraseParserRange:
