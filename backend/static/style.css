@@ -388,9 +388,13 @@ summary:hover { color: var(--accent); }
 .product-section-nav a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 14px; text-decoration: none; }
 .product-section-nav a:hover { color: var(--accent); }
 .product-detail-section, #product-details { scroll-margin-top: 20px; }
-.product-source-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 0 0; font-size: 14px; }
-.product-source-toolbar select { width: auto; max-width: 100%; }
-.product-source-toolbar span { font-size: 13px; }
+.product-source-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; margin-top: 24px; padding: 20px 24px; border: 1px solid #d9d5f4; border-radius: 12px; background: #f5f3ff; }
+.product-source-toolbar[hidden] { display: none; }
+.product-source-copy { display: grid; gap: 5px; }
+.product-source-copy label { color: var(--ink); font-size: 16px; font-weight: 700; }
+.product-source-copy span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+.product-source-toolbar select { width: min(100%, 360px); min-height: 50px; padding: 12px 16px; border: 1px solid #8d82d5; border-radius: 9px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.product-source-toolbar select:focus-visible { outline: 3px solid #b9b0f2; outline-offset: 2px; }
 .detail-input { margin-bottom: 16px; }
 .review-toolbar { display: flex; flex-wrap: wrap; gap: 20px; padding: 0 0 20px; }
 .review-toolbar label { min-width: 170px; }
@@ -418,7 +422,7 @@ summary:hover { color: var(--accent); }
   .product-detail-hero { grid-template-columns: minmax(0,1fr); }
   .gallery-main { min-height: 220px; }
   .gallery-main .product-detail-image { height: 220px; }
-  .product-source-toolbar { align-items: flex-start; flex-direction: column; }
+  .product-source-toolbar { align-items: stretch; flex-direction: column; padding: 18px; }
   .product-source-toolbar select { width: 100%; }
   .review-toolbar { gap: 12px; }
   .review-toolbar label { flex: 1; min-width: 120px; }
