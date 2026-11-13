@@ -22,6 +22,7 @@ from .wb import WildberriesAdapter
 from .ym import YandexMarketAdapter
 from .regions import region_scope, regional_delivery, regional_url
 from .variants import signature as variant_signature
+from .matching import model_key, compatible
 
 # How many raw offers we are willing to request from one provider for one
 # search call. Ozon/WB only ever fetch a single public page regardless of
@@ -291,17 +292,25 @@ class MarketplaceSearchService:
         # If several same-market listings share a GTIN/title, pair them in
         # stable order with listings from other marketplaces where possible.
         grouped: dict[str, list[list[Offer]]] = defaultdict(list)
+        model_buckets = defaultdict(list)
         for offer in offers:
-            buckets = grouped[offer_group_key(offer)]
+            key = offer_group_key(offer)
+            buckets = grouped[key]
+            model = model_key(offer)
+            candidates = list(buckets)
+            if model:
+                candidates.extend(bucket for bucket in model_buckets[model] if all(bucket is not old for old in candidates))
             product_offers = next(
-                (bucket for bucket in buckets
-                 if all(item.marketplace != offer.marketplace for item in bucket)),
+                (bucket for bucket in candidates
+                 if all(item.marketplace != offer.marketplace and compatible(item, offer) for item in bucket)),
                 None,
             )
             if product_offers is None:
                 product_offers = []
                 buckets.append(product_offers)
             product_offers.append(offer)
+            if model and all(product_offers is not bucket for bucket in model_buckets[model]):
+                model_buckets[model].append(product_offers)
 
         products = []
         for key, product_buckets in grouped.items():

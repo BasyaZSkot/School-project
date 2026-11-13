@@ -1,5 +1,4 @@
 import asyncio
-from typing import List
 
 import httpx
 from loguru import logger
@@ -8,10 +7,6 @@ if __package__:
     from .common_data import HEADERS
 else:
     from common_data import HEADERS
-if __package__:
-    from .dto import DataPage
-else:
-    from dto import DataPage
 
 
 class WbCatalogAsyncFetcher:
@@ -19,14 +14,13 @@ class WbCatalogAsyncFetcher:
     def __init__(self,
                  search_phrase: str,
                  cookies: dict,
-                 pages: List[DataPage] | None = None,
+                 pages: list | None = None,
                  batch_size: int = 50,
                  max_concurrent: int = 50,
                  timeout: int = 10,
                  max_retries: int = 4,
                  pause_between_batches: float = 1
                  ):
-        self.pages = pages  # Kept for callers; price ranges are not used in limited mode.
         self.search_phrase = search_phrase
         self.cookies = cookies
         self.headers = HEADERS

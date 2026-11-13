@@ -6,3 +6,7 @@ __pycache__/
 .coverage
 htmlcov/
 backend/data/
+
+# Generated browser downloads and standalone parser exports
+downloaded_files/
+backend/src/parcers/wb_parse_search_phrase-master/results/

@@ -426,7 +426,7 @@ function saveSearchState() {
   if ((savedResponse.region?.id ?? null) !== Region.getId()) return;
   try {
     sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-      version: 4, query: activeQuery, data: savedResponse, region_id:Region.getId(),
+      version: 5, query: activeQuery, data: savedResponse, region_id:Region.getId(),
       displayed: displayedProductCount, scrollY: window.scrollY, filters:readFilters()
     }));
   } catch { /* Browsing also works when storage is unavailable or full. */ }
@@ -434,9 +434,9 @@ function saveSearchState() {
 function restoreSearchState() {
   try {
     const state = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || "null");
-    if (!state || ![1,2,3].includes(state.version) || typeof state.query !== "string" ||
+    if (!state || ![1,2,3,4,5].includes(state.version) || typeof state.query !== "string" ||
         !Array.isArray(state.data?.products) || !Number.isInteger(state.displayed)) return;
-    if (state.version < 4 || (state.region_id ?? null) !== Region.getId()) {
+    if (state.version < 5 || (state.region_id ?? null) !== Region.getId()) {
       runSearch(state.query).then(() => {
         if (savedResponse) {populateFilters(state.filters); applyFilters(state.displayed);}
       });

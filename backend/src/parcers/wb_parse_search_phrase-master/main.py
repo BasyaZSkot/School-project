@@ -4,31 +4,17 @@ from loguru import logger
 
 if __package__:
     from .add_images import add_images
-else:
-    from add_images import add_images
-if __package__:
-    from .add_price_wb_wallet import add_price_with_wb_wallet
-else:
-    from add_price_wb_wallet import add_price_with_wb_wallet
-if __package__:
     from .get_token import get_token
-else:
-    from get_token import get_token
-if __package__:
     from .models import Items
-else:
-    from models import Items
-if __package__:
-    from .saver import SaveWbData
-else:
-    from saver import SaveWbData
-if __package__:
     from .wb_catalog_parser import WbCatalogAsyncFetcher
 else:
+    from add_images import add_images
+    from get_token import get_token
+    from models import Items
     from wb_catalog_parser import WbCatalogAsyncFetcher
 
 
-def parse(search_phrase):
+def parse(search_phrase, include_wallet=False):
     wb_token = get_token()
 
     cookies = {
@@ -55,13 +41,16 @@ def parse(search_phrase):
     logger.info("Добавляем картинки")
     product_models = add_images(product_models)
 
-    logger.info("Добавляем цену с WB-кошельком")
-    product_models = add_price_with_wb_wallet(product_models)
+    if include_wallet:
+        if __package__:
+            from .add_price_wb_wallet import add_price_with_wb_wallet
+        else:
+            from add_price_wb_wallet import add_price_with_wb_wallet
+        product_models = add_price_with_wb_wallet(product_models)
 
     logger.info("Данные добавлены")
-    # SaveWbData().wb_save(products=product_models)
     return product_models
 
 
 if __name__ == "__main__":
-    print(parse(search_phrase="кроссовки мужские nike"))
+    print(parse(search_phrase="кроссовки мужские nike", include_wallet=True))
