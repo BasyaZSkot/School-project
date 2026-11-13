@@ -24,7 +24,7 @@ function changeText(change) {
   if (change.amount === 0) return "Без изменений · 0 %";
   const sign = change.amount < 0 ? "−" : "+";
   const percent = new Intl.NumberFormat("ru-RU", {maximumFractionDigits: 2}).format(Math.abs(change.percent));
-  return (change.amount < 0 ? "↓ " : "↑ ") + sign + money(Math.abs(change.amount), change.currency) + " (" + sign + percent + " %)";
+  return (change.amount < 0 ? "↓ " : "↑ ") + sign + money(Math.abs(change.amount), change.currency) + " (" + sign + percent + "\u00a0%)";
 }
 function changeClass(change) { return change?.amount < 0 ? "price-down" : change?.amount > 0 ? "price-up" : "price-neutral"; }
 function svgNode(tag, attrs = {}, text) {

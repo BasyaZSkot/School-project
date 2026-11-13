@@ -143,7 +143,7 @@
     const selectedId=candidate?.id || saved()?.id;
     points.forEach(p=> {
       const selected=p.id===selectedId;
-      const marker=new window.ymaps.Placemark([p.lat,p.lon],{iconContent:market==="Яндекс Маркет" ? "Я" : market==="Ozon" ? "O" : "WB"},{preset:"islands#circleIcon",iconColor:selected ? "#231243" : "#5a52dc"});
+      const marker=new window.ymaps.Placemark([p.lat,p.lon],{iconContent:market==="Яндекс Маркет" ? "Я" : market==="Ozon" ? "O" : "WB"},{preset:"islands#circleIcon",iconColor:selected ? "#171d28" : "#343b49"});
       marker.events.add("click",()=>select(p,false));map.geoObjects.add(marker);
     });
   }

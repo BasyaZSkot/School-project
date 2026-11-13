@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#fafafa">
+  <meta name="theme-color" content="#f6f7f9">
   <title>Вход — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
   <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
@@ -14,17 +14,20 @@
 <body>
   <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
-    <a class="brand" href="/"><img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
-    <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a href="/monitoring">Мои товары</a>
-      <a href="/history">История цен</a>
-    </nav>
-    <a class="top-action" href="/">К поиску</a>
+    <a class="brand" href="/" aria-label="MultiMarket — на главную"><img class="brand-mark" src="/static/icons/multimarket.svg" width="40" height="40" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a></nav>
+    <div class="header-actions">
+      <a class="icon-button notification-link" href="/notifications" aria-label="Уведомления" title="Уведомления"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span></a>
+      <div class="theme-control"><button class="icon-button" id="theme-toggle" type="button" aria-label="Цветовая тема" title="Цветовая тема" aria-expanded="false" aria-controls="theme-menu"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span></button><div id="theme-menu" class="theme-menu" role="group" aria-label="Цветовая тема" hidden><p>Оформление</p><button type="button" data-theme-choice="system" aria-pressed="false"><span class="icon-slot" data-icon="system" aria-hidden="true"></span>Как в системе</button><button type="button" data-theme-choice="light" aria-pressed="false"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span>Светлая</button><button type="button" data-theme-choice="dark" aria-pressed="false"><span class="icon-slot" data-icon="moon" aria-hidden="true"></span>Тёмная</button></div></div>
+      <a class="top-action" href="/account" aria-label="Аккаунт"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span>Аккаунт</span></a>
+      <button id="menu-toggle" class="icon-button menu-toggle" type="button" aria-label="Все разделы" aria-haspopup="dialog" aria-controls="navigation-dialog"><span class="icon-slot" data-icon="menu" aria-hidden="true"></span></button>
+    </div>
   </header>
+  <dialog id="navigation-dialog" class="side-dialog navigation-dialog" aria-labelledby="navigation-title"><div class="drawer-heading"><h2 id="navigation-title">Ваш MultiMarket</h2><button class="icon-button" type="button" data-close-dialog aria-label="Закрыть меню"><span class="icon-slot" data-icon="close" aria-hidden="true"></span></button></div><nav class="menu-links" aria-label="Все разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a><a href="/notifications"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Уведомления</span></a><a href="/account"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span class="nav-label">Аккаунт</span></a><a href="/sources"><span class="icon-slot" data-icon="info" aria-hidden="true"></span><span class="nav-label">О сервисе</span></a></nav></dialog>
   <main class="page auth-page" id="main-content">
     <section class="auth-card">
       <h1>Вход в аккаунт</h1>
-      <p class="auth-intro">Войдите по почте и паролю, чтобы видеть свои отслеживаемые товары.</p>
+      <p class="auth-intro">Сохраняйте находки и узнавайте, когда цена станет лучше.</p>
       <div id="login-error" class="auth-message" role="status" hidden></div>
       <form id="password-form" class="password-form">
         <label id="name-field" hidden>Имя<input id="login-name" name="name" autocomplete="name" maxlength="160"></label>
@@ -47,5 +50,6 @@
       <a class="auth-back" href="/">← Вернуться к поиску</a>
     </section>
   </main>
+<nav class="mobile-nav" aria-label="Основные разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/account"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span class="nav-label">Профиль</span></a></nav>
 </body>
 </html>

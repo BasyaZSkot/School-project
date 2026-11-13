@@ -3,15 +3,12 @@ const input = document.querySelector("#search-input");
 const button = document.querySelector("#search-button");
 const title = document.querySelector("#results-title");
 const count = document.querySelector("#result-count");
-const providerGrid = document.querySelector("#provider-grid");
 const emptyState = document.querySelector("#empty-state");
-const notice = document.querySelector("#notice");
 const offersWrap = document.querySelector("#offers-wrap");
 const offersList = document.querySelector("#offers-list");
 const offersCaption = document.querySelector("#offers-caption");
 const moreButton = document.querySelector("#load-more-button");
 const results = document.querySelector("#results");
-const providerDetails = document.querySelector("#provider-details");
 const loading = document.querySelector("#search-loading");
 const searchGuide = document.querySelector("#search-guide");
 const Catalog = window.MultiMarketCatalog;
@@ -49,29 +46,11 @@ window.addEventListener("resize", queueStickySearch);
 if (window.ResizeObserver && searchHeader) new ResizeObserver(queueStickySearch).observe(searchHeader);
 queueStickySearch();
 
-const providerMeta = {
-  "Ozon": { logo: "O", className: "ozon-logo" },
-  "Wildberries": { logo: "WB", className: "wb-logo" },
-  "Яндекс Маркет": { logo: "Я", className: "ym-logo" }
-};
-const statusMeta = {
-  access_required: { label: "Поиск недоступен", className: "status-warn" },
-  disabled: { label: "Временно выключен", className: "status-neutral" },
-  policy_restricted: { label: "Доступ ограничен", className: "status-warn" },
-  ready: { label: "Товары найдены", className: "status-good" },
-  no_results: { label: "Товары не найдены", className: "status-neutral" },
-  error: { label: "Ошибка запроса", className: "status-error" }
-};
-
 function element(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
-}
-function message(node, text) {
-  node.hidden = !text;
-  node.querySelector("p").textContent = text || "";
 }
 function productsWord(n) {
   const mod10 = n % 10;
@@ -84,35 +63,6 @@ function money(value, currency) {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency", currency: currency || "RUB", minimumFractionDigits: 0, maximumFractionDigits: 2
   }).format(value);
-}
-function renderProviders(providers) {
-  providerGrid.replaceChildren();
-  providerDetails.hidden = !providers?.length;
-  for (const provider of providers || []) {
-    const meta = providerMeta[provider.marketplace] || { logo: "?", className: "" };
-    const info = statusMeta[provider.status] || statusMeta.error;
-    const card = element("article", "provider-card");
-    const top = element("div", "provider-top");
-    top.append(element("span", "provider-logo " + meta.className, meta.logo));
-    top.append(element("span", "status " + info.className, info.label));
-    card.append(top, element("h3", "", provider.marketplace));
-    if (provider.message) card.append(element("p", "provider-message", provider.message));
-    const links = element("div", "provider-links");
-    if (provider.search_url) {
-      const link = element("a", "provider-link", "Открыть поиск ↗");
-      link.href = provider.search_url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      links.append(link);
-    }
-    if (provider.status === "policy_restricted" || provider.status === "access_required") {
-      const setup = element("a", "provider-setup", "Почему поиск недоступен");
-      setup.href = "/sources";
-      links.append(setup);
-    }
-    if (links.childElementCount) card.append(links);
-    providerGrid.append(card);
-  }
 }
 function renderOffers(products, query, append) {
   if (!append) {
@@ -146,6 +96,7 @@ function renderOffers(products, query, append) {
     card.append(head);
     const productPage = element("a", "details-button", product.title || "Товар");
     const productSummary = {
+      query,
       title: product.title || "Товар",
       region_id: Region.getId(),
       offers: (product.sourceOffers || offers).map(offer => ({
@@ -168,7 +119,7 @@ function renderOffers(products, query, append) {
     productPage.href = "/product?data=" + encodeURIComponent(JSON.stringify(productSummary)) + "&key=" + encodeURIComponent(storageKey);
     if (Region.getId() !== null) productPage.href += "&region_id=" + Region.getId();
     const saveProduct = () => {
-      try { sessionStorage.setItem(storageKey, JSON.stringify({title:product.title, offers:product.sourceOffers || offers,region_id:Region.getId()})); } catch {}
+      try { sessionStorage.setItem(storageKey, JSON.stringify({query,title:product.title, offers:product.sourceOffers || offers,region_id:Region.getId()})); } catch {}
     };
     productPage.addEventListener("click", saveProduct);
     productPage.addEventListener("auxclick", saveProduct);
@@ -176,82 +127,21 @@ function renderOffers(products, query, append) {
     productHeading.append(productPage);
     head.append(productHeading);
     card.append(window.MultiMarketLibrary.controls({title:product.title,offers:product.sourceOffers || offers}));
-    const rows = element("div", "offer-rows");
-    const best = Catalog.bestOffers(offers);
-    offers.forEach((offer, index) => {
-      offerCount += 1;
-      const row = element("div", "offer-row");
-      if (index >= 2) row.hidden = true;
-      const info = element("div", "offer-info");
-      info.append(element("strong", "", offer.marketplace));
-      if(offer.seller)info.append(element("span","",""+offer.seller));
-      if (offer.in_stock === false) info.append(element("span", "stock-badge-empty", "Нет в наличии"));
-      for (const badge of Catalog.badges(offer, best).filter(value => value === "Лучшее предложение")) {
-        const label = element("span", "best-price-badge", badge);
-        label.title = badge === "Лучшее предложение"
-          ? "Минимальная цена товара среди доступных предложений в этой валюте. Приоритет у товаров в наличии. Доставка не включена."
-          : badge === "Высокая оценка" ? "Оценка от 4,5 при наличии не менее 10 оценок." : "Опубликованный срок доставки — до 2 дней. Уточните его для своего адреса.";
-        info.append(label);
-      }
-      const delivery = element("p", "offer-delivery", Catalog.deliveryLabel(offer));
-      const right = element("div", "offer-right");
-      right.append(element("strong", "offer-price", money(offer.price, offer.currency)));
-      const actions = element("div", "offer-actions");
-      const link = element("a", "offer-open", "В магазин ↗");
-      link.href = offer.url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      actions.append(link);
-      const watch = element("button", "watch-button", "Следить за ценой");
-      watch.type = "button";
-      watch.addEventListener("click", async () => {
-        watch.disabled = true;
-        watch.textContent = "Добавляем…";
-        try {
-          const authResponse = await fetch("/api/auth/me");
-          if (!authResponse.ok) throw new Error("Не удалось проверить вход.");
-          const auth = await authResponse.json();
-          if (!auth.authenticated) {
-            saveSearchState();
-            location.assign("/login?next=/");
-            return;
-          }
-          const response = await fetch("/api/monitors", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRF-Token": auth.csrf_token },
-            body: JSON.stringify({
-              query, product_url: offer.url, marketplace: offer.marketplace,
-              title: offer.title, interval_seconds: 3600
-            })
-          });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.detail || "Не удалось добавить товар.");
-          watch.textContent = "Отслеживается";
-          message(notice, "Товар добавлен. Его цена и история доступны в разделе «Мои товары».");
-        } catch (error) {
-          watch.disabled = false;
-          watch.textContent = "Следить за ценой";
-          message(notice, error.message);
-        }
-      });
-      actions.append(watch);
-      right.append(actions);
-      row.append(info, delivery, right);
-      rows.append(row);
-    });
-    card.append(rows);
-    if (offers.length > 2) {
-      const more = element("button", "text-button offer-show-more", "Все предложения (" + offers.length + ")");
-      more.type = "button";
-      more.setAttribute("aria-expanded", "false");
-      more.addEventListener("click", () => {
-        const expanded = more.getAttribute("aria-expanded") === "true";
-        [...rows.children].forEach((row, index) => { if (index >= 2) row.hidden = expanded; });
-        more.setAttribute("aria-expanded", String(!expanded));
-        more.textContent = expanded ? "Все предложения (" + offers.length + ")" : "Свернуть предложения";
-      });
-      card.append(more);
+    const best = [...Catalog.bestOffers(offers)];
+    const primary = best.find(o => Catalog.currency(o) === "RUB") || best[0] || offers[0];
+    const price = element("div", "catalog-price");
+    price.append(element("strong", "offer-price", money(primary.price, primary.currency)));
+    if (offers.length > 1) {
+      const n = offers.length, ending = n % 10 === 1 && n % 100 !== 11 ? "предложение" : [2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100) ? "предложения" : "предложений";
+      price.append(element("span", "catalog-offer-count", n + " " + ending));
     }
+    card.prepend(price);
+    const meta = element("div", "catalog-meta", primary.marketplace);
+    if (primary.rating > 0) {const rating = element("span", "catalog-rating");rating.append(window.MultiMarketUI.icon("star"),document.createTextNode(String(primary.rating)));meta.append(rating);}
+    card.append(meta);
+    if (offers.every(o => o.in_stock === false)) card.append(element("span", "stock-badge stock-badge-empty", "Нет в наличии"));
+    if (!imageUrl) {const fallback = element("div", "catalog-image-fallback");fallback.append(window.MultiMarketUI.icon("bag"),element("span", "", "Фото пока нет"));head.prepend(fallback);}
+    offerCount += offers.length;
     offersList.append(card);
     productCount += 1;
     renderedCount += 1;
@@ -330,6 +220,7 @@ function applyFilters(displayed = DISPLAY_BATCH_SIZE) {
   }
   const active = [filters.min,filters.max,filters.brand,filters.marketplace,filters.rating,filters.delivery,filters.stock].filter(Boolean).length;
   document.querySelector("#filter-active-count").textContent = active ? "· " + active : "";
+  document.querySelector("#filter-button-count").textContent = active ? String(active) : "";
   feedback.textContent = "Найдено: " + filteredProducts.length + " из " + bufferedProducts.length;
   saveSearchState();
 }
@@ -361,17 +252,16 @@ async function fetchSearchResults(sequence = searchSequence) {
   Region.observeOffers(bufferedProducts.flatMap(p => p.offers || []));
   displayedProductCount = 0;
   title.textContent = "Результаты для «" + data.query + "»";
-  renderProviders(data.providers);
+
   filterForm.reset();
   populateFilters();
   applyFilters();
-  providerDetails.open = !bufferedProducts.length;
+
   if (!bufferedProducts.length) {
     emptyState.querySelector("strong").textContent = "Товары не найдены";
-    emptyState.querySelector("span").textContent = "Уточните бренд и модель или откройте поиск на площадке ниже.";
+    emptyState.querySelector("span").textContent = "Уточните бренд и модель или попробуйте другой запрос.";
   }
 
-  message(notice, data.notice || "Загружено до 200 товаров с каждой включённой площадки. Совпадающие товары объединены; остальные показаны отдельно.");
   updateMoreButton();
   saveSearchState();
   return data;
@@ -391,9 +281,9 @@ async function runSearch(query) {
   results.setAttribute("aria-busy", "true");
   searchGuide.hidden = true;
   loading.hidden = false;
-  providerDetails.hidden = true;
+
   filterForm.hidden = true;
-  providerDetails.open = false;
+
   count.textContent = "";
   input.value = activeQuery;
   button.disabled = true;
@@ -402,12 +292,11 @@ async function runSearch(query) {
   emptyState.hidden = true;
   offersWrap.hidden = true;
   moreButton.hidden = true;
-  message(notice, "");
   try {
     await fetchSearchResults(sequence);
   } catch (error) {
     if (sequence !== searchSequence) return;
-    providerGrid.replaceChildren();
+
     title.textContent = "Поиск не выполнен";
     emptyState.hidden = false;
     emptyState.querySelector("strong").textContent = "Не удалось выполнить поиск";
@@ -467,15 +356,14 @@ function restoreSearchState() {
     results.hidden = false;
     searchGuide.hidden = true;
     title.textContent = "Результаты для «" + activeQuery + "»";
-    renderProviders(state.data.providers);
+
     populateFilters(state.filters);
     applyFilters(state.displayed);
-    providerDetails.open = !bufferedProducts.length;
+
     if (!bufferedProducts.length) {
       emptyState.querySelector("strong").textContent = "Товары не найдены";
-      emptyState.querySelector("span").textContent = "Уточните бренд и модель или откройте поиск на площадке ниже.";
+      emptyState.querySelector("span").textContent = "Уточните бренд и модель или попробуйте другой запрос.";
     }
-    message(notice, state.data.notice);
     updateMoreButton();
     requestAnimationFrame(() => window.scrollTo(0, Number(state.scrollY) || 0));
   } catch { /* Ignore an outdated or incomplete saved search. */ }

@@ -5,6 +5,7 @@ const $ = selector => document.querySelector(selector);
 let sources = [], selectedSource = 0, galleryImages = [], imageIndex = 0;
 let reviewLimit = 5, specsExpanded = false;
 let activeVariant="";
+let productQuery = "";
 const variantKey=o=>JSON.stringify(Object.fromEntries(Object.entries(o.variants||{}).sort(([a],[b])=>a.localeCompare(b))));
 const variantLabel=o=>Object.values(o.variants||{}).join(" · ") || "Вариант не указан";
 function updateVariants(){
@@ -49,7 +50,8 @@ function readProduct() {
   const offers = product.offers.filter(o => o && validProductUrl(o.marketplace,o.url) && Catalog.validPrice(o)).slice(0,600)
     .map(o => ({...o, specifications:Array.isArray(o.specifications) ? o.specifications : [],
       reviews:Array.isArray(o.reviews) ? o.reviews : [], delivery:o.delivery && typeof o.delivery === "object" ? o.delivery : {}}));
-  return offers.length ? {title:product.title.slice(0,300), offers} : null;
+  const query = typeof product.query === "string" && product.query.trim() ? product.query.trim() : product.title;
+  return offers.length ? {title:product.title.slice(0,300), query:query.slice(0,160), offers} : null;
 }
 function showImage(index) {
   if (!galleryImages.length) return;
@@ -190,7 +192,32 @@ function renderOffers() {
     controls.append(element("strong","product-offer-price",money(offer.price,offer.currency)));
     const link = element("a","button " + (best.has(offer) || visible.length === 1 ? "button-primary" : "button-secondary"),"В магазин ↗");
     link.href = offer.url; link.target = "_blank"; link.rel = "noopener noreferrer";
-    controls.append(link); card.append(info,controls); $("#product-offers").append(card);
+    const watch = element("button", "button button-secondary product-watch", "Следить за ценой");
+    watch.type = "button";
+    watch.prepend(window.MultiMarketUI.icon("bell"));
+    watch.addEventListener("click", async () => {
+      watch.disabled = true;
+      try {
+        const auth = await window.MultiMarketSession.ready;
+        if (auth.error) throw new Error("Не удалось проверить вход. Попробуйте ещё раз.");
+        if (!auth.authenticated) {
+          location.assign("/login?next=" + encodeURIComponent(location.pathname + location.search));
+          return;
+        }
+        await window.MultiMarketSession.request("/api/monitors", "POST", {
+          query: productQuery,
+          product_url: offer.url, marketplace: offer.marketplace,
+          title: String(offer.title || $("#product-title").textContent).slice(0,300), interval_seconds: 3600
+        });
+        watch.textContent = "Цена отслеживается";
+        watch.prepend(window.MultiMarketUI.icon("check"));
+        $("#product-status").textContent = "Товар добавлен в «Мои товары». Настройки уведомлений — в аккаунте.";
+      } catch (error) {
+        watch.disabled = false;
+        $("#product-status").textContent = error.message;
+      }
+    });
+    controls.append(link, watch); card.append(info,controls); $("#product-offers").append(card);
   }
   const choices = [...best];
   const recommendation = choices.find(o => Catalog.currency(o) === "RUB") || choices[0];
@@ -218,6 +245,7 @@ async function loadProduct() {
     $("#product-description").textContent = "Нет данных."; showSpecs(); showReviews(); return;
   }
   sources = product.offers.map(o => ({...o,delivery:Region.scopeDelivery(o.delivery)}));
+  productQuery = product.query;
   Region.observeOffers(sources);
   document.title = product.title + " — MultiMarket"; $("#product-title").textContent = product.title;
   [...new Set(sources.map(o => o.marketplace))].forEach(m => $("#product-marketplaces").append(element("span","marketplace-chip",m)));

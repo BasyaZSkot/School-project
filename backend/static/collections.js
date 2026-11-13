@@ -5,8 +5,6 @@
   const $=s=>document.querySelector(s);let favorites=[],favoritePromise,compareRun=0;const details=new Map(),selected=new Map();
   const controlProducts=new WeakMap();let updateQueued=false;
   function scheduleUpdate(){if(updateQueued)return;updateQueued=true;queueMicrotask(()=>{updateQueued=false;update();});}
-  const quick=$(".main-nav");
-  for(const [href,label] of [["/favorites","Избранное"],["/compare","Сравнение"],["/notifications","Уведомления"]]){const a=el("a",label);a.href=href;if(location.pathname===href)a.setAttribute("aria-current","page");if(href==="/compare")a.dataset.compareLink="";quick.append(a);}
   const feedback=el("p",undefined,"library-feedback");feedback.id="library-feedback";feedback.role="status";feedback.hidden=true;$(".topbar")?.insertAdjacentElement("afterend",feedback);
   function say(text){feedback.textContent=text;feedback.hidden=!text;}
   function compareList(){try{return D.read(localStorage);}catch{return [];}}
@@ -16,9 +14,9 @@
     return favoritePromise;
   }
   function update(){
-    const list=compareList();document.querySelectorAll("[data-compare-link]").forEach(a=>a.textContent="Сравнение"+(list.length?" ("+list.length+")":""));
-    document.querySelectorAll(".compare-button").forEach(b=>{const p=controlProducts.get(b),yes=!!p&&list.some(item=>D.sameProduct(item,p));b.setAttribute("aria-pressed",String(yes));b.textContent=yes?"В сравнении":"Сравнить";});
-    document.querySelectorAll(".favorite-button").forEach(b=>{const p=controlProducts.get(b),yes=!!p&&favorites.some(item=>D.sameProduct(item,p));b.setAttribute("aria-pressed",String(yes));b.textContent=yes?"В избранном":"В избранное";});
+    const list=compareList();document.querySelectorAll("[data-compare-link]").forEach(a=>{const label=a.querySelector(".nav-label")||a;label.textContent="Сравнение"+(list.length?" ("+list.length+")":"");});
+    document.querySelectorAll(".compare-button").forEach(b=>{const p=controlProducts.get(b),yes=!!p&&list.some(item=>D.sameProduct(item,p));b.setAttribute("aria-pressed",String(yes));b.replaceChildren(window.MultiMarketUI.icon("compare"));b.setAttribute("aria-label",yes?"Убрать из сравнения":"Добавить к сравнению");b.title=yes?"В сравнении":"Сравнить";});
+    document.querySelectorAll(".favorite-button").forEach(b=>{const p=controlProducts.get(b),yes=!!p&&favorites.some(item=>D.sameProduct(item,p));b.setAttribute("aria-pressed",String(yes));b.replaceChildren(window.MultiMarketUI.icon("heart"));b.setAttribute("aria-label",yes?"Удалить из избранного":"Добавить в избранное");b.title=yes?"В избранном":"В избранное";});
   }
   function href(product){
     const p=D.snapshot(product),key="multimarket.product."+(crypto.randomUUID?.()||Date.now()+Math.random());

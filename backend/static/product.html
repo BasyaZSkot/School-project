@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#fafafa">
+  <meta name="theme-color" content="#f6f7f9">
   <meta name="description" content="Подробности и сравнение предложений товара.">
   <title>Товар — MultiMarket</title>
   <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
@@ -23,19 +23,20 @@
 <body>
   <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="MultiMarket, поиск">
-      <img class="brand-mark" src="/static/icons/multimarket.svg" width="35" height="35" alt=""><span>Multi<span class="brand-accent">Market</span></span>
-    </a>
-    <nav class="main-nav" aria-label="Главная навигация">
-      <a href="/">Поиск</a><a data-delivery-link href="/delivery">Доставка</a><a href="/monitoring">Мои товары</a>
-      <a href="/history">История цен</a>
-    </nav>
-    <a class="top-action" href="/account">Аккаунт</a>
+    <a class="brand" href="/" aria-label="MultiMarket — на главную"><img class="brand-mark" src="/static/icons/multimarket.svg" width="40" height="40" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a></nav>
+    <div class="header-actions">
+      <a class="icon-button notification-link" href="/notifications" aria-label="Уведомления" title="Уведомления"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span></a>
+      <div class="theme-control"><button class="icon-button" id="theme-toggle" type="button" aria-label="Цветовая тема" title="Цветовая тема" aria-expanded="false" aria-controls="theme-menu"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span></button><div id="theme-menu" class="theme-menu" role="group" aria-label="Цветовая тема" hidden><p>Оформление</p><button type="button" data-theme-choice="system" aria-pressed="false"><span class="icon-slot" data-icon="system" aria-hidden="true"></span>Как в системе</button><button type="button" data-theme-choice="light" aria-pressed="false"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span>Светлая</button><button type="button" data-theme-choice="dark" aria-pressed="false"><span class="icon-slot" data-icon="moon" aria-hidden="true"></span>Тёмная</button></div></div>
+      <a class="top-action" href="/account" aria-label="Аккаунт"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span>Аккаунт</span></a>
+      <button id="menu-toggle" class="icon-button menu-toggle" type="button" aria-label="Все разделы" aria-haspopup="dialog" aria-controls="navigation-dialog"><span class="icon-slot" data-icon="menu" aria-hidden="true"></span></button>
+    </div>
   </header>
+  <dialog id="navigation-dialog" class="side-dialog navigation-dialog" aria-labelledby="navigation-title"><div class="drawer-heading"><h2 id="navigation-title">Ваш MultiMarket</h2><button class="icon-button" type="button" data-close-dialog aria-label="Закрыть меню"><span class="icon-slot" data-icon="close" aria-hidden="true"></span></button></div><nav class="menu-links" aria-label="Все разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a><a href="/notifications"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Уведомления</span></a><a href="/account"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span class="nav-label">Аккаунт</span></a><a href="/sources"><span class="icon-slot" data-icon="info" aria-hidden="true"></span><span class="nav-label">О сервисе</span></a></nav></dialog>
   <main class="page" id="main-content">
     <a class="back-link" href="/">← Поиск</a>
     <p class="product-region">Город доставки: <span data-region-label>Регион площадки</span> <a data-delivery-link href="/delivery#city">Изменить</a></p>
-    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery"><img class="emoji-icon" src="/static/icons/emoji/1f4cd.svg" alt="" aria-hidden="true"> Пункт выдачи</a><span data-pickup-summary class="muted"></span></div>
+    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span> Пункт выдачи</a><span data-pickup-summary class="muted"></span></div>
     <section class="product-detail-hero">
       <div id="product-image-wrap" class="product-detail-image-wrap" hidden>
         <button id="gallery-open" class="gallery-main" type="button" aria-label="Увеличить фото товара"><img id="product-image" class="product-detail-image" alt=""></button>
@@ -45,21 +46,21 @@
       <div class="product-detail-copy">
         <div id="product-marketplaces" class="product-marketplaces"></div>
         <h1 id="product-title">Загружаем товар…</h1>
-        <p id="product-status" class="detail-status" role="status">Читаем доступные публичные данные.</p>
+        <p id="product-status" class="detail-status" role="status">Собираем предложения магазинов.</p>
         <div id="product-best-price" class="product-best-price" hidden></div>
-        <div id="product-collection-actions"></div>
+        <div class="product-hero-actions"><a class="button button-primary" href="#product-comparison">Сравнить предложения <span class="icon-slot" data-icon="arrow" aria-hidden="true"></span></a><div id="product-collection-actions"></div></div>
         <div id="product-variant-toolbar" class="product-variant-toolbar" hidden><label for="product-variant">Вариант товара</label><select id="product-variant"></select><p class="muted">Цены для выбранного варианта</p></div>
       </div>
     </section>
     <nav class="product-section-nav" aria-label="Разделы товара"><a href="#product-comparison">Предложения</a><a href="#product-details">Характеристики</a><a href="#product-review-section">Отзывы</a></nav>
 
     <section class="product-detail-section" id="product-comparison">
-      <div class="section-heading"><div><div class="section-kicker">СРАВНЕНИЕ</div><h2><img class="emoji-icon" src="/static/icons/emoji/1f6cd.svg" alt="" aria-hidden="true"> Предложения</h2></div></div>
+      <div class="section-heading"><div><div class="section-kicker">ВЫБОР МАГАЗИНА</div><h2><span class="icon-slot" data-icon="bag" aria-hidden="true"></span> Предложения магазинов</h2></div></div>
       <div id="product-offers" class="product-offer-list"></div>
-      <p class="muted"><img class="emoji-icon" src="/static/icons/emoji/1f69a.svg" alt="" aria-hidden="true"> Доставка зависит от адреса. Цена без учёта доставки.</p>
+      <p class="muted"><span class="icon-slot" data-icon="truck" aria-hidden="true"></span> Доставка зависит от адреса. Цена без учёта доставки.</p>
     </section>
 
-    <div class="product-source-toolbar" id="product-source-toolbar" hidden><div class="product-source-copy"><label for="product-source">Выберите магазин</label><span id="product-source-hint">Фото, характеристики и отзывы</span></div><select id="product-source" aria-describedby="product-source-hint"></select></div>
+    <div class="product-source-toolbar" id="product-source-toolbar" hidden><div class="product-source-copy"><label for="product-source">Данные магазина</label><span id="product-source-hint">Фото, характеристики и отзывы</span></div><select id="product-source" aria-describedby="product-source-hint"></select></div>
     <section class="product-about" id="product-details" aria-labelledby="about-title">
       <h2 id="about-title">О товаре</h2>
       <div class="product-about-content">
@@ -79,7 +80,7 @@
     </section>
 
     <section class="product-detail-section detail-panel" id="product-review-section">
-      <div class="section-kicker">ОТЗЫВЫ</div><h2><img class="emoji-icon" src="/static/icons/emoji/2b50.svg" alt="" aria-hidden="true"> Отзывы</h2>
+      <div class="section-kicker">ОТЗЫВЫ</div><h2><span class="icon-slot" data-icon="star" aria-hidden="true"></span> Отзывы</h2>
       <div class="product-review-summary"><strong id="product-rating">Нет данных</strong><span id="product-review-count">Нет данных</span></div>
       <div class="review-toolbar"><label>Оценка<select id="review-rating"><option value="">Все оценки</option><option value="5">5 звёзд</option><option value="4">4 звезды</option><option value="3">3 звезды</option><option value="2">2 звезды</option><option value="1">1 звезда</option></select></label><label>Порядок<select id="review-sort"><option value="original">Как в магазине</option><option value="newest">Сначала новые</option><option value="highest">С высокой оценкой</option><option value="lowest">С низкой оценкой</option></select></label></div>
       <div id="product-reviews" class="detail-review-list"></div>
@@ -90,5 +91,6 @@
     <dialog id="gallery-dialog" class="gallery-dialog" aria-label="Фотографии товара"><div class="gallery-dialog-toolbar"><span id="gallery-dialog-count"></span><button id="gallery-close" class="button button-secondary" type="button">Закрыть</button></div><img id="gallery-dialog-image" alt=""><div class="gallery-controls"><button id="gallery-dialog-prev" class="button button-secondary" type="button" aria-label="Предыдущее фото в галерее">←</button><button id="gallery-dialog-next" class="button button-secondary" type="button" aria-label="Следующее фото в галерее">→</button></div></dialog>
   </main>
   <footer class="footer"><nav class="footer-contacts" aria-label="Контакты автора"><a href="https://github.com/BasyaZSkot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://t.me/kvakva239" target="_blank" rel="noopener noreferrer">Telegram</a><a href="mailto:vasya.zeldin@gmail.com">Почта</a><a href="mailto:zeldinvasya@gmail.com">Запасная почта</a></nav><span>© MultiMarket</span><a href="/">К поиску товаров</a></footer>
+<nav class="mobile-nav" aria-label="Основные разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/account"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span class="nav-label">Профиль</span></a></nav>
 </body>
 </html>
