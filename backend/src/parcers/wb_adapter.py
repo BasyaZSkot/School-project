@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable
 import json
+import math
 from typing import Any
 
 from .base import MAX_PROVIDER_LIMIT, DisabledAdapter, Offer, ProviderResult, SearchStatus
@@ -26,7 +27,7 @@ def _rubles_from_kopecks(value: Any) -> float | None:
         kopecks = float(value)
     except (TypeError, ValueError):
         return None
-    if kopecks <= 0:
+    if not math.isfinite(kopecks) or kopecks <= 0:
         return None
     return kopecks / 100
 
@@ -62,7 +63,7 @@ def _wb_specifications(value: Any) -> list[dict[str, str]]:
     return specifications
 
 
-def wb_record_to_offer(record: Any) -> Offer | None:
+def wb_record_to_offer(record: Any, *, prices_in_rubles: bool = False) -> Offer | None:
     """Convert one record shaped like the example WB Item model to an Offer."""
     raw_id = _read(record, "id")
     try:
@@ -79,21 +80,30 @@ def wb_record_to_offer(record: Any) -> Offer | None:
     # Prefer raw nested size prices: the example Pydantic model may already have
     # converted those into salePriceU/priceU when the top-level values were absent.
     price = None
+    if prices_in_rubles:
+        for key in ("salePriceU", "priceU"):
+            try:
+                value = float(_read(record, key))
+                if math.isfinite(value) and value > 0:
+                    price = value
+                    break
+            except (TypeError, ValueError):
+                pass
     sizes = _read(record, "sizes", []) or []
-    if sizes:
+    if price is None and sizes:
         size_price = _read(sizes[0], "price")
         if size_price:
             price = _rubles_from_kopecks(
                 _read(size_price, "product") or _read(size_price, "basic")
             )
-    if price is None:
+    if price is None and not prices_in_rubles:
         price = _rubles_from_kopecks(_read(record, "salePriceU"))
-    if price is None:
+    if price is None and not prices_in_rubles:
         price = _rubles_from_kopecks(_read(record, "priceU"))
     if price is None:
         return None
 
-    image_links = str(_read(record, "image_links", "") or "")
+    image_links = str(_read(record, "image_links", "") or "").replace("\\u200b", "")
     image_url = next(
         (part.strip().lstrip("\u200b") for part in image_links.split(";")
          if part.strip().lstrip("\u200b").startswith("https://")),
@@ -132,6 +142,7 @@ def wb_record_to_offer(record: Any) -> Offer | None:
         url=f"https://www.wildberries.ru/catalog/{product_id}/detail.aspx",
         external_id=str(product_id),
         brand=brand,
+        seller=str(_read(record, "supplier", "") or "").strip() or None,
         gtin=None,
         in_stock=in_stock,
         image_url=image_url,
@@ -155,11 +166,12 @@ class WildberriesAdapter(DisabledAdapter):
         "или письменное разрешение. Пока доступна прямая ссылка на поиск."
     )
 
-    def __init__(self, source: RecordSource | None = None):
+    def __init__(self, source: RecordSource | None = None, *, prices_in_rubles: bool = False):
         self.source = source
+        self.prices_in_rubles = prices_in_rubles
 
     @classmethod
-    def from_record_source(cls, source: RecordSource) -> "WildberriesAdapter":
+    def from_record_source(cls, source: RecordSource, *, prices_in_rubles: bool = False) -> "WildberriesAdapter":
         """Build an adapter around an explicitly approved async WB data source.
 
         The callable must return records compatible with the public Item-like
@@ -168,7 +180,7 @@ class WildberriesAdapter(DisabledAdapter):
         """
         if not callable(source):
             raise TypeError("source must be an async callable")
-        return cls(source=source)
+        return cls(source=source, prices_in_rubles=prices_in_rubles)
 
     async def search(self, query: str, limit: int = 20) -> ProviderResult:
         if self.source is None:
@@ -181,9 +193,13 @@ class WildberriesAdapter(DisabledAdapter):
 
         records = await self.source(query, limit)
         offers = []
+        seen = set()
         for record in records:
-            offer = wb_record_to_offer(record)
+            offer = wb_record_to_offer(record, prices_in_rubles=self.prices_in_rubles)
+            if offer is not None and offer.external_id in seen:
+                continue
             if offer is not None:
+                seen.add(offer.external_id)
                 offers.append(offer)
             if len(offers) >= limit:
                 break

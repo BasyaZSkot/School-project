@@ -1,10 +1,41 @@
 import unittest
+import os
+from types import SimpleNamespace
+from unittest.mock import patch
 from unittest.mock import AsyncMock
 
 from src.parcers.wb_adapter import WildberriesAdapter, wb_record_to_offer
 
 
 class WildberriesRecordMappingTests(unittest.TestCase):
+    def test_item_model_prices_are_already_rubles_and_all_images_are_preserved(self):
+        item = SimpleNamespace(id=1241343962, name='Кроссовки Air Force 1', salePriceU=3328.0,
+            priceU=10350.0, wb_wallet=3261, brand='Nike', supplier='BOSTON', totalQuantity=35,
+            reviewRating=4.8, feedbacks=581, sizes=[],
+            image_links='\u200bhttps://basket-41.wbbasket.ru/1.webp;https://basket-41.wbbasket.ru/2.webp')
+        offer = wb_record_to_offer(item, prices_in_rubles=True)
+        self.assertEqual(offer.price, 3328.0)
+        self.assertEqual(offer.seller, 'BOSTON')
+        self.assertEqual(len(offer.image_urls), 2)
+        self.assertEqual(offer.rating, 4.8)
+        self.assertEqual(offer.review_count, 581)
+        self.assertTrue(offer.in_stock)
+
+    def test_items_source_is_connected_to_site_search_and_capped(self):
+        import asyncio
+        from src.parcers.wb import WildberriesAdapter as PublicAdapter
+        from src.parcers.service import MarketplaceSearchService
+        items = [SimpleNamespace(id=i+1, name=f'Item {i}', salePriceU=3328.0) for i in range(210)]
+        source = AsyncMock(return_value=items)
+        with patch.dict(os.environ, {'MULTIMARKET_WB_SOURCE': 'items'}), patch('src.parcers.wb_items.fetch_items', source):
+            adapter = PublicAdapter.from_env()
+            result = asyncio.run(adapter.search('test', 200))
+            self.assertEqual(len(result.offers), 200)
+            service = MarketplaceSearchService(adapters=[adapter], enabled_search_marketplaces={'Wildberries'})
+            data = asyncio.run(service.search('test', limit=20))
+            self.assertTrue(data['products'])
+            self.assertEqual(data['products'][0]['offers'][0]['price'], 3328.0)
+
     def test_maps_parser_item_fields_and_converts_kopecks(self):
         offer = wb_record_to_offer({
             "id": 123456,

@@ -47,6 +47,10 @@ class WildberriesAdapter(PublicHtmlSearchAdapter):
 
     @classmethod
     def from_env(cls):
+        if os.getenv("MULTIMARKET_WB_SOURCE", "").strip().lower() == "items":
+            from . import wb_items
+            from .wb_adapter import WildberriesAdapter as ItemsAdapter
+            return ItemsAdapter.from_record_source(wb_items.fetch_items, prices_in_rubles=True)
         feed_url = os.getenv("MULTIMARKET_WB_FEED_URL", "").strip()
         if feed_url:
             feed_format = os.getenv("MULTIMARKET_WB_FEED_FORMAT", "").strip().lower()
