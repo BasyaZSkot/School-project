@@ -16,7 +16,7 @@
   <script src="/static/preferences-sync.js" defer></script>
   <script src="/static/region.js" defer></script>
   <script src="/static/media.js" defer></script><script src="/static/library-data.js" defer></script>
-  <script src="/static/collections.js" defer></script>
+  <script src="/static/collections.js?v=2" defer></script>
   <script src="/static/pickup.js" defer></script>
   <script src="/static/product.js" defer></script>
 </head>
@@ -35,7 +35,7 @@
   <main class="page" id="main-content">
     <a class="back-link" href="/">← Поиск</a>
     <p class="product-region">Город доставки: <span data-region-label>Регион площадки</span> <a data-delivery-link href="/delivery#city">Изменить</a></p>
-    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery">📍 Пункт выдачи</a><span data-pickup-summary class="muted"></span></div>
+    <div class="pickup-preference"><a class="button button-secondary" data-delivery-link href="/delivery"><img class="emoji-icon" src="/static/icons/emoji/1f4cd.svg" alt="" aria-hidden="true"> Пункт выдачи</a><span data-pickup-summary class="muted"></span></div>
     <section class="product-detail-hero">
       <div id="product-image-wrap" class="product-detail-image-wrap" hidden>
         <button id="gallery-open" class="gallery-main" type="button" aria-label="Увеличить фото товара"><img id="product-image" class="product-detail-image" alt=""></button>
@@ -54,9 +54,9 @@
     <nav class="product-section-nav" aria-label="Разделы товара"><a href="#product-comparison">Предложения</a><a href="#product-details">Характеристики</a><a href="#product-review-section">Отзывы</a></nav>
 
     <section class="product-detail-section" id="product-comparison">
-      <div class="section-heading"><div><div class="section-kicker">СРАВНЕНИЕ</div><h2>🛍️ Предложения</h2></div></div>
+      <div class="section-heading"><div><div class="section-kicker">СРАВНЕНИЕ</div><h2><img class="emoji-icon" src="/static/icons/emoji/1f6cd.svg" alt="" aria-hidden="true"> Предложения</h2></div></div>
       <div id="product-offers" class="product-offer-list"></div>
-      <p class="muted">🚚 Доставка зависит от адреса. Цена без учёта доставки.</p>
+      <p class="muted"><img class="emoji-icon" src="/static/icons/emoji/1f69a.svg" alt="" aria-hidden="true"> Доставка зависит от адреса. Цена без учёта доставки.</p>
     </section>
 
     <div class="product-source-toolbar" id="product-source-toolbar" hidden><div class="product-source-copy"><label for="product-source">Выберите магазин</label><span id="product-source-hint">Фото, характеристики и отзывы</span></div><select id="product-source" aria-describedby="product-source-hint"></select></div>
@@ -79,7 +79,7 @@
     </section>
 
     <section class="product-detail-section detail-panel" id="product-review-section">
-      <div class="section-kicker">ОТЗЫВЫ</div><h2>⭐ Отзывы</h2>
+      <div class="section-kicker">ОТЗЫВЫ</div><h2><img class="emoji-icon" src="/static/icons/emoji/2b50.svg" alt="" aria-hidden="true"> Отзывы</h2>
       <div class="product-review-summary"><strong id="product-rating">Нет данных</strong><span id="product-review-count">Нет данных</span></div>
       <div class="review-toolbar"><label>Оценка<select id="review-rating"><option value="">Все оценки</option><option value="5">5 звёзд</option><option value="4">4 звезды</option><option value="3">3 звезды</option><option value="2">2 звезды</option><option value="1">1 звезда</option></select></label><label>Порядок<select id="review-sort"><option value="original">Как в магазине</option><option value="newest">Сначала новые</option><option value="highest">С высокой оценкой</option><option value="lowest">С низкой оценкой</option></select></label></div>
       <div id="product-reviews" class="detail-review-list"></div>

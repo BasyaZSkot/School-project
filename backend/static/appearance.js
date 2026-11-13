@@ -3,7 +3,7 @@
   const root=document.documentElement, themeKey='multimarket.theme', views=['tiles','compact','list'];
   function read(key,fallback){try{return localStorage.getItem(key)||fallback;}catch{return fallback;}}
   function save(key,value){try{localStorage.setItem(key,value);}catch{}}
-  function theme(value){root.dataset.theme=value==='dark'?'dark':'light';const button=document.querySelector('.theme-switch');if(button){button.textContent=root.dataset.theme==='dark'?'☀️':'🌙';button.setAttribute('aria-label',root.dataset.theme==='dark'?'Включить светлую тему':'Включить тёмную тему');button.title=button.getAttribute('aria-label');}}
+  function theme(value){root.dataset.theme=value==='dark'?'dark':'light';const button=document.querySelector('.theme-switch');if(button){const icon=document.createElement('img');icon.className='emoji-icon';icon.alt='';icon.src='/static/icons/emoji/'+(root.dataset.theme==='dark'?'2600':'1f319')+'.svg';button.replaceChildren(icon);button.setAttribute('aria-label',root.dataset.theme==='dark'?'Включить светлую тему':'Включить тёмную тему');button.title=button.getAttribute('aria-label');}}
   theme(read(themeKey,'light'));
   function view(scope,value){root.dataset[scope+'View']=views.includes(value)?value:'tiles';}
   view('search',read('multimarket.view.search','tiles'));view('product',read('multimarket.view.product','tiles'));

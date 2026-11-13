@@ -38,17 +38,24 @@ html[data-theme=dark] :is(.offer-product-image,.gallery-main,.gallery-thumb) { b
 .view-option:hover { background:var(--soft); color:var(--ink); }
 .view-option[aria-pressed=true] { background:var(--soft); color:var(--accent); }
 .view-option:focus-visible,.theme-switch:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.main-nav a[href="/"]::before { content:'🔍'; }
-.main-nav a[href="/delivery"]::before { content:'📍'; }
-.main-nav a[href="/monitoring"]::before { content:'🔔'; }
-.main-nav a[href="/history"]::before { content:'📈'; }
-.main-nav a[href="/favorites"]::before { content:'🤍'; }
-.main-nav a[href="/compare"]::before { content:'⚖️'; }
-.main-nav a[href="/notifications"]::before { content:'💬'; }
-.main-nav a::before { margin-right:6px; font-size:14px; }
+.main-nav a[href="/"]::before { background-image:url('/static/icons/emoji/1f50d.svg'); }
+.main-nav a[href="/delivery"]::before { background-image:url('/static/icons/emoji/1f4cd.svg'); }
+.main-nav a[href="/monitoring"]::before { background-image:url('/static/icons/emoji/1f514.svg'); }
+.main-nav a[href="/history"]::before { background-image:url('/static/icons/emoji/1f4c8.svg'); }
+.main-nav a[href="/favorites"]::before { background-image:url('/static/icons/emoji/1f90d.svg'); }
+.main-nav a[href="/compare"]::before { background-image:url('/static/icons/emoji/2696.svg'); }
+.main-nav a[href="/notifications"]::before { background-image:url('/static/icons/emoji/1f4ac.svg'); }
+.main-nav a::before { content:''; display:inline-block; width:16px; height:16px; flex:0 0 16px; margin-right:7px; background-size:contain; background-repeat:no-repeat; background-position:center; }
 html[data-theme=dark] :is(.top-action,.button-secondary) { color:var(--ink); background:var(--paper); border-color:var(--line); }
 html[data-theme=dark] :is(.top-action,.button-secondary):hover { color:var(--ink); background:var(--soft); border-color:var(--accent); }
 html[data-theme=dark] .button-primary { color:#17171e; background:#aaa3ff; }
 html[data-theme=dark] .button-primary:hover { color:#17171e; background:#cbc6ff; }
 html[data-theme=dark] .notification-card { background:var(--paper); color:var(--ink); }
 @media(max-width:580px) { .view-switch { justify-content:flex-end; margin-left:auto; } }
+
+.emoji-icon { display:inline-block; width:1.15em; height:1.15em; vertical-align:-0.16em; object-fit:contain; }
+.theme-switch .emoji-icon { display:block; width:22px; height:22px; margin:auto; }
+
+#search-button::before { content:""; display:inline-block; width:17px; height:17px; margin-right:6px; vertical-align:-3px; background:url("/static/icons/emoji/1f50d.svg") center/contain no-repeat; }
+
+html[data-theme=dark] .search-form button { color:#17171e; }
