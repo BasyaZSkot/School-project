@@ -2,7 +2,7 @@
   'use strict';
   const root = document.documentElement, themeKey = 'multimarket.theme';
   const system = window.matchMedia('(prefers-color-scheme: dark)');
-  const themes = ['system', 'light', 'dark'], views = ['tiles', 'compact', 'list'];
+  const themes = ['light', 'dark'], views = ['tiles', 'compact', 'list'];
   const paths = {
     search: '<circle cx="10.8" cy="10.8" r="7.2"/><path d="m16 16 4.5 4.5"/>',
     heart: '<path d="M20.5 5.5a5 5 0 0 0-7 0L12 7l-1.5-1.5a5 5 0 0 0-7 7L12 21l8.5-8.5a5 5 0 0 0 0-7Z"/>',
@@ -13,7 +13,7 @@
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/>',
     moon: '<path d="M21 13a9 9 0 0 1-10-10A9 9 0 1 0 21 13Z"/>',
-    system: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>',
+    settings: '<path d="m9.5 3-.6 2.4-2 .9-2.3-.7-2.5 4.3L4 11.5v2l-1.9 1.6 2.5 4.3 2.3-.7 2 .9.6 2.4h5l.6-2.4 2-.9 2.3.7 2.5-4.3-1.9-1.6v-2l1.9-1.6-2.5-4.3-2.3.7-2-.9L14.5 3Z"/><circle cx="12" cy="12.5" r="3"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
     compact: '<path d="M3 3h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4zM3 10h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4zM3 17h4v4H3zm7 0h4v4h-4zm7 0h4v4h-4z"/>',
     list: '<rect x="3" y="4" width="5" height="6" rx="1"/><rect x="3" y="14" width="5" height="6" rx="1"/><path d="M12 5h9m-9 4h6m-6 6h9m-9 4h6"/>',
@@ -40,32 +40,55 @@
   function read(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } }
   function save(key, value) { try { localStorage.setItem(key, value); } catch {} }
   function theme(value) {
-    const preference = themes.includes(value) ? value : 'system';
+    const preference = themes.includes(value) ? value : 'light';
     root.dataset.themePreference = preference;
-    root.dataset.theme = preference === 'system' ? (system.matches ? 'dark' : 'light') : preference;
+    root.dataset.theme = preference;
     document.querySelectorAll('[data-theme-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === preference)));
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = root.dataset.theme === 'dark' ? '#171a20' : '#f6f7f9';
+    if (meta) meta.content = preference === 'dark' ? '#171a20' : '#e5e7eb';
+    const toggle = document.querySelector('#theme-toggle');
+    if (toggle) {
+      const label = preference === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
+      toggle.setAttribute('aria-label', label); toggle.title = label;
+      toggle.replaceChildren(icon(preference === 'dark' ? 'sun' : 'moon'));
+    }
   }
-  theme(read(themeKey, 'system'));
-  system.addEventListener('change', () => { if (root.dataset.themePreference === 'system') theme('system'); });
+  // Resolve the old automatic preference once; future OS changes never override a choice.
+  const storedTheme = read(themeKey, 'light');
+  const initialTheme = storedTheme === 'system' ? (system.matches ? 'dark' : 'light') : storedTheme;
+  theme(initialTheme);
+  if (storedTheme === 'system') save(themeKey, initialTheme);
   function view(scope, value) { root.dataset[scope + 'View'] = views.includes(value) ? value : 'tiles'; }
   for (const scope of ['search', 'product']) view(scope, read('multimarket.view.' + scope, 'tiles'));
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-icon]').forEach(node => node.replaceChildren(icon(node.dataset.icon)));
-    document.querySelectorAll('.main-nav a, .mobile-nav a, .menu-links a').forEach(link => {
+    document.querySelectorAll('.main-nav a, .mobile-nav a, .menu-links a, .top-action').forEach(link => {
       const href = link.getAttribute('href');
       if (location.pathname === href || (href === '/account' && ['/login','/forgot-password','/reset-password','/verify-email','/admin'].includes(location.pathname))) link.setAttribute('aria-current', 'page');
     });
-    const toggle = document.querySelector('#theme-toggle'), menu = document.querySelector('#theme-menu');
-    function closeTheme(focus) { if (!menu) return; menu.hidden = true; toggle.setAttribute('aria-expanded', 'false'); if (focus) toggle.focus(); }
-    if (toggle && menu) {
-      toggle.addEventListener('click', () => { const open = menu.hidden; menu.hidden = !open; toggle.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('[aria-pressed="true"]')?.focus(); });
-      menu.querySelectorAll('button').forEach(button => button.addEventListener('click', () => { theme(button.dataset.themeChoice); save(themeKey, button.dataset.themeChoice); closeTheme(true); }));
-      document.addEventListener('click', event => { if (!event.target.closest('.theme-control')) closeTheme(false); });
-      document.addEventListener('keydown', event => { if (event.key === 'Escape' && !menu.hidden) closeTheme(true); });
-    }
+    document.querySelector('#theme-toggle')?.addEventListener('click', () => {
+      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      theme(next); save(themeKey, next);
+    });
+    document.querySelectorAll('[data-theme-choice]').forEach(button => button.addEventListener('click', () => {
+      theme(button.dataset.themeChoice); save(themeKey, root.dataset.theme);
+    }));
     theme(root.dataset.themePreference);
+    const settingsLinks = [...document.querySelectorAll('.settings-nav a')];
+    if (settingsLinks.length) {
+      const selectSection = id => settingsLinks.forEach(link => {
+        if (link.hash === '#' + id) link.setAttribute('aria-current', 'location');
+        else link.removeAttribute('aria-current');
+      });
+      selectSection(settingsLinks.some(link => link.hash === location.hash) ? location.hash.slice(1) : 'profile-settings');
+      if (window.IntersectionObserver) {
+        const sections = new IntersectionObserver(entries => {
+          const visible = entries.filter(entry => entry.isIntersecting);
+          if (visible.length) selectSection(visible[0].target.id);
+        }, {rootMargin:'-90px 0px -60% 0px'});
+        document.querySelectorAll('.settings-section').forEach(section => sections.observe(section));
+      }
+    }
     for (const [opener, target] of [['menu-toggle','navigation-dialog'], ['open-filters','filter-dialog']]) {
       const button = document.getElementById(opener), dialog = document.getElementById(target);
       if (!button || !dialog) continue;
@@ -89,7 +112,7 @@
     document.querySelectorAll('dialog').forEach(dialog => new MutationObserver(syncDialogs).observe(dialog,{attributes:true,attributeFilter:['open']}));
   });
   window.addEventListener('storage', event => {
-    if (event.key === themeKey) theme(event.newValue || 'system');
+    if (event.key === themeKey) theme(event.newValue || 'light');
     for (const scope of ['search','product']) if (event.key === 'multimarket.view.' + scope) {
       view(scope,event.newValue || 'tiles'); document.querySelectorAll('.view-option[data-scope="' + scope + '"]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.view === root.dataset[scope + 'View'])));
     }

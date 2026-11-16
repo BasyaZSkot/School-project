@@ -11,7 +11,7 @@
     } catch { return {exists:false,id:null}; }
   }
   function valid(id) { return id === null || cities.some(c => c.id === id); }
-  function name() { return cities.find(c => c.id === selected)?.name || (automaticName ? automaticName + " (площадка)" : "Регион площадки"); }
+  function name() { return cities.find(c => c.id === selected)?.name || automaticName || "Город доставки"; }
   function updateLabels() { document.querySelectorAll("[data-region-label]").forEach(node => node.textContent = name()); }
   function renderCities() {
     const list = $("#region-list"); if (!list) return;

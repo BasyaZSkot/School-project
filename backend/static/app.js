@@ -30,13 +30,14 @@ const DISPLAY_BATCH_SIZE = 20;
 // Keep the same working form visible below the actual navigation height.
 const searchMarker = document.querySelector("#search-sticky-marker");
 const searchHeader = document.querySelector(".topbar");
+const searchDock = document.querySelector(".search-dock");
 let stickyFrame = 0;
 function updateStickySearch() {
   stickyFrame = 0;
-  if (!searchMarker || !searchHeader) return;
+  if (!searchMarker || !searchHeader || !searchDock) return;
   const height = searchHeader.getBoundingClientRect().height;
-  form.style.setProperty("--search-sticky-top", height + "px");
-  form.classList.toggle("search-form-stuck", searchMarker.getBoundingClientRect().top <= height);
+  searchDock.style.setProperty("--search-sticky-top", height + "px");
+  searchDock.classList.toggle("is-stuck", searchMarker.getBoundingClientRect().top <= height);
 }
 function queueStickySearch() {
   if (!stickyFrame) stickyFrame = requestAnimationFrame(updateStickySearch);

@@ -3,12 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f7f9">
-  <title>Аккаунт — MultiMarket</title>
-  <link rel="icon" type="image/svg+xml" href="/static/icons/multimarket.svg">
-  <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico" sizes="16x16 32x32 48x48">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
-  <script src="/static/appearance.js"></script><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/appearance.css">
+  <meta name="theme-color" content="#e5e7eb">
+  <title>Настройки — MultiMarket</title>
+  <link rel="icon" href="data:,">
+  <script src="/static/appearance.js?v=humane-1"></script><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/appearance.css?v=humane-1">
   <script src="/static/session.js" defer></script>
   <script src="/static/pickup-data.js" defer></script>
   <script src="/static/preferences-sync.js" defer></script>
@@ -19,41 +17,45 @@
 <body>
   <a class="skip-link" href="#main-content">Перейти к содержимому</a>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="MultiMarket — на главную"><img class="brand-mark" src="/static/icons/multimarket.svg" width="40" height="40" alt=""><span>Multi<span class="brand-accent">Market</span></span></a>
-    <nav class="main-nav" aria-label="Главная навигация"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a></nav>
+    <a class="brand" href="/" aria-label="MultiMarket — на главную"><span>Multi<span class="brand-accent">Market</span></span></a>
+    <nav class="main-nav" aria-label="Главная навигация"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Отслеживание</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a></nav>
     <div class="header-actions">
       <a class="icon-button notification-link" href="/notifications" aria-label="Уведомления" title="Уведомления"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span></a>
-      <div class="theme-control"><button class="icon-button" id="theme-toggle" type="button" aria-label="Цветовая тема" title="Цветовая тема" aria-expanded="false" aria-controls="theme-menu"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span></button><div id="theme-menu" class="theme-menu" role="group" aria-label="Цветовая тема" hidden><p>Оформление</p><button type="button" data-theme-choice="system" aria-pressed="false"><span class="icon-slot" data-icon="system" aria-hidden="true"></span>Как в системе</button><button type="button" data-theme-choice="light" aria-pressed="false"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span>Светлая</button><button type="button" data-theme-choice="dark" aria-pressed="false"><span class="icon-slot" data-icon="moon" aria-hidden="true"></span>Тёмная</button></div></div>
-      <a class="top-action" href="/account" aria-label="Аккаунт"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span>Аккаунт</span></a>
+      <div class="theme-control"><button class="icon-button" id="theme-toggle" type="button" aria-label="Включить тёмную тему" title="Включить тёмную тему"><span class="icon-slot" data-icon="moon" aria-hidden="true"></span></button></div>
+      <a class="top-action" href="/account" aria-label="Настройки"><span class="icon-slot" data-icon="settings" aria-hidden="true"></span><span>Настройки</span></a>
       <button id="menu-toggle" class="icon-button menu-toggle" type="button" aria-label="Все разделы" aria-haspopup="dialog" aria-controls="navigation-dialog"><span class="icon-slot" data-icon="menu" aria-hidden="true"></span></button>
     </div>
   </header>
-  <dialog id="navigation-dialog" class="side-dialog navigation-dialog" aria-labelledby="navigation-title"><div class="drawer-heading"><h2 id="navigation-title">Ваш MultiMarket</h2><button class="icon-button" type="button" data-close-dialog aria-label="Закрыть меню"><span class="icon-slot" data-icon="close" aria-hidden="true"></span></button></div><nav class="menu-links" aria-label="Все разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a><a href="/notifications"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Уведомления</span></a><a href="/account"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span class="nav-label">Аккаунт</span></a><a href="/sources"><span class="icon-slot" data-icon="info" aria-hidden="true"></span><span class="nav-label">О сервисе</span></a></nav></dialog>
-  <main class="page auth-page" id="main-content">
-    <section class="account-card">
-      <div class="account-profile">
-        <img id="account-picture" class="account-picture" alt="" hidden>
-        <div><h1 id="account-name">Загружаем профиль…</h1><p id="account-email" class="muted"></p></div>
+  <dialog id="navigation-dialog" class="side-dialog navigation-dialog" aria-labelledby="navigation-title"><div class="drawer-heading"><h2 id="navigation-title">Разделы</h2><button class="icon-button" type="button" data-close-dialog aria-label="Закрыть меню"><span class="icon-slot" data-icon="close" aria-hidden="true"></span></button></div><nav class="menu-links" aria-label="Все разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Отслеживание</span></a><a href="/history"><span class="icon-slot" data-icon="chart" aria-hidden="true"></span><span class="nav-label">История цен</span></a><a href="/delivery"><span class="icon-slot" data-icon="pin" aria-hidden="true"></span><span class="nav-label">Доставка</span></a><a href="/notifications"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Уведомления</span></a><a href="/account"><span class="icon-slot" data-icon="settings" aria-hidden="true"></span><span class="nav-label">Настройки</span></a><a href="/sources"><span class="icon-slot" data-icon="info" aria-hidden="true"></span><span class="nav-label">О сервисе</span></a></nav></dialog>
+  <main class="page settings-page" id="main-content">
+    <section class="page-intro"><h1>Настройки</h1><p>Профиль, оформление и уведомления.</p></section>
+    <div class="settings-layout">
+      <nav class="settings-nav" aria-label="Разделы настроек"><a href="#profile-settings">Профиль</a><a href="#appearance-settings">Оформление</a><a href="#delivery-settings">Доставка</a><a href="#notification-settings">Уведомления</a></nav>
+      <div class="settings-content">
+        <section class="settings-section" id="profile-settings" aria-labelledby="profile-settings-title">
+          <h2 id="profile-settings-title">Профиль</h2>
+          <div class="account-profile"><img id="account-picture" class="account-picture" alt="" hidden><div><h3 id="account-name">Загружаем профиль…</h3><p id="account-email" class="muted"></p></div></div>
+          <dl class="account-details"><div><dt>Способ входа</dt><dd id="account-provider">Загрузка…</dd></div><div><dt>Электронная почта</dt><dd id="account-verified">Проверяем…</dd></div></dl>
+          <div id="email-verification" hidden><p class="muted">Подтвердите почту, чтобы получать письма об изменении цены.</p><button id="verify-email" type="button" class="button button-secondary">Подтвердить почту</button><p id="verify-message" class="muted" role="status"></p></div>
+          <details class="account-meta"><summary>Сведения об аккаунте</summary><dl class="account-details"><div><dt>Роль</dt><dd id="account-role"></dd></div><div><dt>Дата создания</dt><dd id="account-created"></dd></div></dl><a id="admin-link" class="text-button" href="/admin" hidden>Администрирование</a></details>
+          <p id="account-message" class="auth-message" role="status" hidden></p>
+        </section>
+        <section class="settings-section" id="appearance-settings" aria-labelledby="appearance-settings-title"><h2 id="appearance-settings-title">Оформление</h2><p class="muted">Выберите удобную тему. Изменения сохраняются сразу.</p><div class="theme-choices" role="group" aria-label="Цветовая тема"><button type="button" data-theme-choice="light" aria-pressed="false"><span class="icon-slot" data-icon="sun" aria-hidden="true"></span>Светлая</button><button type="button" data-theme-choice="dark" aria-pressed="false"><span class="icon-slot" data-icon="moon" aria-hidden="true"></span>Тёмная</button></div></section>
+        <section class="settings-section" id="delivery-settings" aria-labelledby="delivery-settings-title"><h2 id="delivery-settings-title">Доставка</h2><p class="muted">Город и пункты выдачи для поиска товаров.</p><a class="settings-link" href="/delivery">Настроить доставку<span class="icon-slot" data-icon="arrow" aria-hidden="true"></span></a></section>
+        <section id="notification-settings" class="settings-section account-notifications" aria-labelledby="notification-settings-title">
+          <h2 id="notification-settings-title">Уведомления</h2><p class="muted">Куда сообщать об изменении цены. Для каждого товара можно выбрать другие каналы.</p>
+          <form id="notification-form">
+            <div class="notification-setting-row"><label class="check-label"><input id="notification-email" type="checkbox">Электронная почта</label><p id="notification-email-status" class="muted"></p></div>
+            <div class="notification-setting-row"><label class="check-label"><input id="notification-telegram" type="checkbox">Telegram</label><div><p id="notification-telegram-status" class="muted"></p><button id="telegram-connect" type="button" class="text-button">Подключить Telegram</button><button id="telegram-disconnect" type="button" class="text-button" hidden>Отключить Telegram</button></div></div>
+            <a id="telegram-connect-link" class="button button-secondary" target="_blank" rel="noopener noreferrer" hidden>Открыть бота и нажать «Начать»</a><button id="notification-refresh" class="text-button" type="button">Проверить подключение</button>
+            <div class="settings-save"><button type="submit" class="button button-primary">Сохранить настройки</button><p id="notification-message" role="status" class="muted"></p></div>
+          </form>
+        </section>
+        <div class="settings-signout"><button id="logout-button" class="text-button" type="button">Выйти из аккаунта</button></div>
       </div>
-      <dl class="account-details">
-        <div><dt>Способ входа</dt><dd id="account-provider"></dd></div>
-        <div><dt>Роль</dt><dd id="account-role"></dd></div>
-        <div><dt>Создан</dt><dd id="account-created"></dd></div>
-        <div><dt>Подтверждение почты</dt><dd id="account-verified">Проверяем…</dd></div>
-      </dl>
-      <div id="email-verification" hidden><p class="muted">Подтвердите почту, чтобы получать письма об изменении цены.</p><button id="verify-email" type="button" class="button button-secondary">Отправить письмо подтверждения</button><p id="verify-message" class="muted" role="status"></p></div>
-      <div class="account-actions">
-        <a class="button button-primary" href="/monitoring">Мои товары</a>
-        <a class="button button-secondary" href="/delivery">Настроить доставку</a>
-        <a class="button button-secondary" href="/favorites">Избранное</a>
-        <a id="admin-link" class="button button-secondary" href="/admin" hidden>Открыть админ-панель</a>
-        <button id="logout-button" class="button button-danger" type="button">Выйти</button>
-      </div>
-      <p id="account-message" class="auth-message" role="status" hidden></p>
-      <section id="notification-settings" class="account-notifications" aria-labelledby="notification-settings-title"><h2 id="notification-settings-title">Уведомления</h2><p class="muted">Выберите каналы по умолчанию для новых отслеживаемых товаров. У каждого товара можно изменить настройки.</p><form id="notification-form"><label class="check-label"><input id="notification-email" type="checkbox">Письма на подтверждённую почту</label><p id="notification-email-status" class="muted"></p><label class="check-label"><input id="notification-telegram" type="checkbox">Telegram</label><p id="notification-telegram-status" class="muted"></p><div class="toolbar-actions"><button id="telegram-connect" type="button" class="button button-secondary">Подключить Telegram</button><button id="telegram-disconnect" type="button" class="text-button" hidden>Отключить Telegram</button><button type="submit" class="button button-primary">Сохранить каналы</button></div><a id="telegram-connect-link" class="button button-secondary" target="_blank" rel="noopener noreferrer" hidden>Открыть бота и нажать «Начать»</a><button id="notification-refresh" class="text-button" type="button">Проверить подключение</button></form><p id="notification-message" role="status" class="muted"></p></section>
-    </section>
+    </div>
   </main>
   <footer class="footer"><nav class="footer-contacts" aria-label="Контакты автора"><a href="https://github.com/BasyaZSkot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://t.me/kvakva239" target="_blank" rel="noopener noreferrer">Telegram</a><a href="mailto:vasya.zeldin@gmail.com">Почта</a><a href="mailto:zeldinvasya@gmail.com">Запасная почта</a></nav><span>© MultiMarket</span><a href="/">К поиску товаров</a></footer>
-<nav class="mobile-nav" aria-label="Основные разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Мои товары</span></a><a href="/account"><span class="icon-slot" data-icon="user" aria-hidden="true"></span><span class="nav-label">Профиль</span></a></nav>
+<nav class="mobile-nav" aria-label="Основные разделы"><a href="/"><span class="icon-slot" data-icon="search" aria-hidden="true"></span><span class="nav-label">Поиск</span></a><a href="/favorites"><span class="icon-slot" data-icon="heart" aria-hidden="true"></span><span class="nav-label">Избранное</span></a><a href="/compare" data-compare-link><span class="icon-slot" data-icon="compare" aria-hidden="true"></span><span class="nav-label">Сравнение</span></a><a href="/monitoring"><span class="icon-slot" data-icon="bell" aria-hidden="true"></span><span class="nav-label">Отслеживание</span></a><a href="/account"><span class="icon-slot" data-icon="settings" aria-hidden="true"></span><span class="nav-label">Настройки</span></a></nav>
 </body>
 </html>

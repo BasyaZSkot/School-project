@@ -177,7 +177,7 @@
     if(!cities.length){$("#delivery-city-slot").textContent="Города временно недоступны. Обновите страницу.";status("Не удалось загрузить города.");renderSaved();return;}
     try{mapConfig=await request("/api/map-config");}catch{mapConfig={};}
     $("#pickup-suggest-credit").hidden=!mapConfig.yandex_suggest;
-    $("#pickup-city").replaceChildren(new Option("Регион площадки автоматически",""),...cities.map(c=>new Option(c.name,c.id)));
+    $("#pickup-city").replaceChildren(new Option("Город по данным магазина",""),...cities.map(c=>new Option(c.name,c.id)));
     const params=new URLSearchParams(location.search),marketplace=params.get("marketplace");
     city=Region.getId();market=D.markets.includes(marketplace) ? marketplace : D.markets[0];
     $("#pickup-city").value=city || "";$("#pickup-market").value=market;$("#pickup-address").value="";origin=null;
